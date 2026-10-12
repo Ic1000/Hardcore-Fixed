@@ -1,0 +1,108 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Backpack = LocalPlayer:WaitForChild("Backpack")
+
+-- ========================================================
+-- 🎨 CHỌN CHỦ ĐỀ NẾN TẠI ĐÂY:
+-- Ghi là "Guiding"      -> Xanh nước biển (Guiding Light)
+-- Ghi là "Curious"      -> Màu vàng (Curious Light)
+-- Ghi là "Mischievous"  -> Màu đỏ (Mischievous Light)
+-- ========================================================
+local CandleTheme = "Curious" -- Bro có thể đổi thành "Guiding" hoặc "Mischievous" tùy thích!
+
+-- Thiết lập màu sắc tự động theo chủ đề
+local lightColor, partColor, particleColor, toolName
+if CandleTheme == "Guiding" then
+	lightColor = Color3.fromRGB(0, 160, 255)       -- Xanh nước biển
+	partColor = Color3.fromRGB(20, 100, 200)      
+	particleColor = Color3.fromRGB(50, 180, 255)   
+	toolName = "Guiding Candle"
+elseif CandleTheme == "Curious" then
+	lightColor = Color3.fromRGB(255, 210, 0)      -- Màu vàng
+	partColor = Color3.fromRGB(200, 160, 20)      
+	particleColor = Color3.fromRGB(255, 230, 50)  
+	toolName = "Curious Candle"
+else -- Mischievous Light (Màu đỏ)
+	lightColor = Color3.fromRGB(255, 20, 20)      -- Ánh sáng đỏ rực
+	partColor = Color3.fromRGB(150, 15, 15)       -- Thân nến sáp đỏ
+	particleColor = Color3.fromRGB(255, 50, 50)   -- Ngọn lửa đỏ
+	toolName = "Mischievous Candle"
+end
+
+-- 1. Tải Tool an toàn từ Asset ID
+local success, result = pcall(function()
+	return game:GetObjects("rbxassetid://18499257720")[1]
+end)
+
+if not success or not result then
+	warn("[Candle Script] Không thể tải Asset Model!")
+	return
+end
+
+local candleTool = result
+candleTool.Name = toolName
+candleTool.Grip = CFrame.new(0.205505371, -0.140681446, -0.0234375, 0, 0, 1, 0, 1, 0, -1, 0, 0)
+
+-- 2. Áp dụng màu sắc toàn bộ phần thân, lửa và ánh sáng của nến
+for _, desc in ipairs(candleTool:GetDescendants()) do
+	if desc:IsA("Light") then
+		desc.Color = lightColor
+	elseif desc:IsA("ParticleEmitter") then
+		desc.Color = ColorSequence.new(particleColor)
+	elseif desc:IsA("BasePart") then
+		desc.Color = partColor
+	end
+end
+
+candleTool.Parent = Backpack
+
+-- 3. Khởi tạo Animation và Sound
+local anim = Instance.new("Animation")
+anim.AnimationId = "rbxassetid://11545520304"
+
+local sound = Instance.new("Sound")
+sound.SoundId = "rbxassetid://11702836205"
+sound.Parent = candleTool
+
+local animationTrack = nil
+
+-- 4. Xử lý sự kiện khi cầm nến (Equipped)
+candleTool.Equipped:Connect(function()
+	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local humanoid = character:WaitForChild("Humanoid")
+	local animator = humanoid:FindFirstChildOfClass("Animator") or humanoid:WaitForChild("Animator")
+	
+	local mainLight = candleTool:FindFirstChild("MainLight", true)
+	if mainLight and mainLight:IsA("Light") then
+		mainLight.Color = lightColor
+		mainLight.Brightness = 2.5
+		mainLight.Range = 10
+	end
+	
+	sound:Play()
+	
+	if anim then
+		local loadSuccess, track = pcall(function()
+			return animator:LoadAnimation(anim)
+		end)
+		if loadSuccess and track then
+			animationTrack = track
+			animationTrack.Looped = true
+			animationTrack:Play()
+		end
+	end
+end)
+
+-- 5. Xử lý sự kiện khi cất nến (Unequipped)
+candleTool.Unequipped:Connect(function()
+	local mainLight = candleTool:FindFirstChild("MainLight", true)
+	if mainLight and mainLight:IsA("Light") then
+		mainLight.Color = lightColor
+		mainLight.Brightness = 0.2
+		mainLight.Range = 6
+	end
+	
+	if animationTrack then
+		animationTrack:Stop()
+	end
+end)
