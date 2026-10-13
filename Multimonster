@@ -21,6 +21,59 @@ local destroyedRooms = {}
 local extraModel = nil
 local followConnection = nil
 
+-- CUSTOM SOUND GUIDING LIGHT & TỐC ĐỘ PHÁT
+local CUSTOM_GUIDING_SOUND = "79182044607177" 
+
+local GUIDING_SOUND_IDS = {
+	"9114223282",
+	"9125814524",
+	"10854271454",
+	"9844421112"
+}
+
+local function HandleGuidingSound(snd)
+	if snd:IsA("Sound") then
+		local function checkAndReplace()
+			local isGuiding = false
+			local lowerName = string.lower(snd.Name)
+			
+			if lowerName:find("guiding") then
+				isGuiding = true
+			else
+				for _, id in ipairs(GUIDING_SOUND_IDS) do
+					if string.find(snd.SoundId, id) then
+						isGuiding = true
+						break
+					end
+				end
+			end
+			
+			if isGuiding then
+				if snd.SoundId ~= CUSTOM_GUIDING_SOUND then
+					snd.SoundId = CUSTOM_GUIDING_SOUND
+				end
+				if snd.PlaybackSpeed ~= 0.55 then
+					snd.PlaybackSpeed = 0.55
+				end
+			end
+		end
+		
+		checkAndReplace()
+		snd:GetPropertyChangedSignal("SoundId"):Connect(checkAndReplace)
+		snd:GetPropertyChangedSignal("PlaybackSpeed"):Connect(function()
+			local lowerName = string.lower(snd.Name)
+			if (lowerName:find("guiding") or snd.SoundId == CUSTOM_GUIDING_SOUND) and snd.PlaybackSpeed ~= 0.55 then
+				snd.PlaybackSpeed = 0.55
+			end
+		end)
+	end
+end
+
+game.DescendantAdded:Connect(HandleGuidingSound)
+for _, des in ipairs(game:GetDescendants()) do
+	HandleGuidingSound(des)
+end
+
 -- Asset Model ID
 local JUMPSCARE_MODEL_ID = "12263106166" 
 
@@ -111,7 +164,7 @@ doorSound2.Volume = 3
 doorSound2.Parent = SoundService
 
 --========================================================--
--- ROOM OBJECT BREAK (ĐÃ BỌC HÀM CHUẨN XÁC)
+-- ROOM OBJECT BREAK (ĐÃ SỬA LỖI API NETWORKEOWNERSHIP)
 --========================================================--
 local function BreakRoom(room)
 	if room and not destroyedRooms[room] then
@@ -184,8 +237,9 @@ local function BreakRoom(room)
 										)
 
 										pcall(function()
-											if v:CanSetNetworkOwnership() then
-												v:SetNetworkOwner(LocalPlayer) -- ĐÃ FIX: Dùng đúng biến LocalPlayer viết hoa
+											-- SỬA LỖI: Dùng GetCanSetNetworkOwnership() thay vì gọi trực tiếp CanSetNetworkOwnership()
+											if v:GetCanSetNetworkOwnership() then
+												v:SetNetworkOwner(LocalPlayer)
 											end
 										end)
 
@@ -227,7 +281,7 @@ local function TriggerExtremeShake()
 					camera.CFrame = camera.CFrame * cf
 				end)
 				despawnShake:Start()
-				despawnShake:ShakeOnce(45, 30, 0.05, 5)
+				despawnShake:ShakeOnce(35, 25, 0.05, 5)
 			end
 		end)
 	end)
@@ -549,7 +603,7 @@ entity:SetCallback("OnStartMoving", function()
 						if HumanoidRootPart then
 							HumanoidRootPart.Anchored = false
 						end
-						    humanoid.health = 0
+						-- Đã xóa dòng lỗi entity.Config... ở đây vì spawner v2 không hỗ trợ
 						
 						TweenService:Create(jumpscareImg, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 							Size = UDim2.new(1.2, 0, 1.4, 0),
@@ -573,7 +627,7 @@ entity:SetCallback("OnStartMoving", function()
 						
 						task.spawn(function()
 							local postShake = CameraShakerModule.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
-								camera.CFrame = camera.CFrame * shakeCf -- ĐÃ FIX: Dùng đúng tham số shakeCf
+								camera.CFrame = camera.CFrame * shakeCf
 							end)
 							postShake:Start()
 							
