@@ -58,7 +58,7 @@ candleTool.Parent = Backpack
 
 -- 3. Khởi tạo Animation và Sound
 local anim = Instance.new("Animation")
-anim.AnimationId = "rbxassetid://11545520304"
+anim.AnimationId = "rbxassetid://10479585177"
 
 local sound = Instance.new("Sound")
 sound.SoundId = "rbxassetid://11702836205"
