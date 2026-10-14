@@ -8,7 +8,7 @@ local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
--- Đọc cấu hình mới từ _G.mobile_sprint_config
+-- Đọc cấu hình từ _G.mobile_sprint_config
 local cfg = _G.mobile_sprint_config or {}
 local CONFIG = {
 	usewhileloading = cfg.usewhileloading ~= nil and cfg.usewhileloading or true,
@@ -212,8 +212,10 @@ if UserInputService.TouchEnabled then
 
 		local isGameLoaded = game:IsLoaded()
 
+		-- Kiểm tra logic chạy
 		if isSprinting then
-			if (isGameLoaded or not CONFIG.usewhileloading) and currentHorizontalSpeed < 2 and humanoid.MoveDirection.Magnitude > 0 then
+			-- Nếu người chơi dừng di chuyển (MoveDirection == 0) hoặc bị kẹt vật cản (speed < 2) -> Tự ngắt chạy
+			if (not humanoid or humanoid.MoveDirection.Magnitude == 0) or ((isGameLoaded or not CONFIG.usewhileloading) and currentHorizontalSpeed < 2) then
 				stopSprinting()
 			else
 				stamina = math.clamp(stamina - (CONFIG.staminadrain * deltaTime), 0, CONFIG.maxstamina)
@@ -230,10 +232,7 @@ if UserInputService.TouchEnabled then
 				end
 			end
 		else
-			if isSprinting and (not humanoid or humanoid.MoveDirection.Magnitude == 0) and (isGameLoaded or not CONFIG.usewhileloading) then
-				stopSprinting()
-			end
-			
+			-- Khi không chạy: Đợi hết thời gian trễ (regendelay) thì hồi phục stamina
 			if os.clock() - lastSprintTime >= CONFIG.regendelay then
 				stamina = math.clamp(stamina + (CONFIG.staminaregen * deltaTime), 0, CONFIG.maxstamina)
 				
