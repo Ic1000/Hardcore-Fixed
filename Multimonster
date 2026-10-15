@@ -603,6 +603,7 @@ entity:SetCallback("OnStartMoving", function()
 						if HumanoidRootPart then
 							HumanoidRootPart.Anchored = false
 						end
+                            humanoid.health = 0
 						-- Đã xóa dòng lỗi entity.Config... ở đây vì spawner v2 không hỗ trợ
 						
 						TweenService:Create(jumpscareImg, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
