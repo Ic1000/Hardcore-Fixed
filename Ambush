@@ -1,0 +1,67 @@
+-- Define the globals
+local workspaceService = game:GetService("Workspace")
+local running = true -- Set to true by default so the loop starts running
+
+local function OnAmbushSpawned(model)
+    print("Ambush detected! Applying modifications...")
+    
+    -- 1. Change all sounds inside AmbushMoving to 0.65 speed
+    for _, desc in ipairs(model:GetDescendants()) do
+        if desc:IsA("Sound") then
+            desc.PlaybackSpeed = 0.65
+        end
+    end
+    
+    -- 2. Target the RushNew part and its Attachment
+    local rushNew = model:WaitForChild("RushNew", 5)
+    if rushNew then
+        local attachment = rushNew:WaitForChild("Attachment", 5)
+        if attachment then
+            -- Find the exact ParticleEmitter named "ParticleEmitter"
+            local originalEmitter = attachment:FindFirstChild("ParticleEmitter")
+            
+            if originalEmitter and originalEmitter:IsA("ParticleEmitter") then
+                -- Update the first emitter's texture and squash it vertically
+                originalEmitter.Texture = "rbxassetid://13794553688"
+                originalEmitter.Squash = NumberSequence.new(0.2) -- Flatten vertically
+                
+                -- Clone it, change the texture, and parent it back to the attachment
+                local clonedEmitter = originalEmitter:Clone()
+                clonedEmitter.Texture = "rbxassetid://13794478595"
+                clonedEmitter.Squash = NumberSequence.new(0.2) -- Keep the clone flattened too
+                clonedEmitter.Parent = attachment
+                print("Targeted ParticleEmitter updated, cloned, and squashed successfully!")
+            else
+                warn("Could not find the specific ParticleEmitter named 'ParticleEmitter' yet.")
+            end
+        end
+        
+        -- 3. Add a pure red PointLight directly onto the RushNew part
+        local pointLight = Instance.new("PointLight")
+        pointLight.Color = Color3.fromRGB(255, 0, 0) -- Pure red
+        pointLight.Brightness = 5
+        pointLight.Range = 15
+        pointLight.Parent = rushNew
+        print("Red PointLight added to RushNew!")
+    end
+end
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if running then
+            local ambush = workspaceService:FindFirstChild("AmbushMoving")
+            if ambush and ambush:IsA("Model") then
+                running = false
+                task.spawn(function()
+                    OnAmbushSpawned(ambush)
+                end)
+                repeat
+                    task.wait(0.1)
+                    ambush = workspaceService:FindFirstChild("AmbushMoving")
+                until not ambush
+                running = true
+                print("Ambush gone, loop resumed")
+            end
+        end
+    end
+end)
