@@ -261,8 +261,11 @@ local function BreakRoom(room)
 											)
 
 										pcall(function()
-    part:SetNetworkOwner(LocalPlayer)
+    if part:CanSetNetworkOwnership() then
+        part:SetNetworkOwner(LocalPlayer)
+    end
 end)
+
 										part.CFrame =
 											part.CFrame +
 											Vector3.new(0, 0.05, 0)
