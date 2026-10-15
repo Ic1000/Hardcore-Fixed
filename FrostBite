@@ -1,0 +1,284 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local Debris = game:GetService("Debris")
+
+-- Tạo/Kiểm tra biến toàn cục lưu trạng thái thành tựu
+if _G.FrostbiteAchievementGotten == nil then
+	_G.FrostbiteAchievementGotten = false
+end
+
+-- Đợi phòng tiếp theo được kích hoạt
+ReplicatedStorage:WaitForChild("GameData"):WaitForChild("LatestRoom").Changed:Wait()
+
+local plr = Players.LocalPlayer
+local chr = plr.Character or plr.CharacterAdded:Wait()
+
+local function GetRoom()
+	local currentRooms = workspace:WaitForChild("CurrentRooms", 10)
+	local latestRoomValue = ReplicatedStorage.GameData.LatestRoom.Value
+	if currentRooms then
+		return currentRooms:FindFirstChild(latestRoomValue)
+	end
+	return nil
+end
+
+local currentRoom = GetRoom()
+if not currentRoom then
+	warn("Không tìm thấy phòng hiện tại!")
+	return
+end
+
+-- Tải Frost entity từ Roblox Asset an toàn
+local success, objects = pcall(function()
+	return game:GetObjects("rbxassetid://16705676239")
+end)
+
+if not success or not objects or #objects == 0 then
+	warn("Không thể tải Frost entity! Lỗi Asset ID hoặc bị Executor chặn.")
+	return
+end
+
+local s = objects[1]
+s.Parent = workspace
+
+local entity = s:FindFirstChildWhichIsA("BasePart") or s:FindFirstChild("Part") or s
+if not entity then
+	warn("Không tìm thấy BasePart trong Entity!")
+	return
+end
+
+local roomEntrance = currentRoom:WaitForChild("RoomEntrance", 5)
+if roomEntrance then
+	if entity:IsA("BasePart") then
+		entity.CFrame = roomEntrance.CFrame * CFrame.new(0, -5, -15)
+	elseif entity:IsA("Model") then
+		entity:PivotTo(roomEntrance.CFrame * CFrame.new(0, -5, -15))
+	end
+end
+
+if entity:FindFirstChild("Part") then
+	entity.Part.CFrame = entity.CFrame
+end
+
+if entity:FindFirstChild("Ambience") then pcall(function() entity.Ambience:Stop() end) end
+if entity:FindFirstChild("AmbienceFar") then pcall(function() entity.AmbienceFar:Stop() end) end
+
+if entity:FindFirstChild("Ambience") then
+	entity.Ambience.SoundId = "rbxassetid://1102548016"
+	entity.Ambience.Volume = 0.4
+end
+if entity:FindFirstChild("AmbienceFar") then
+	entity.AmbienceFar.Volume = 0.3
+end
+
+local pointLight = Instance.new("PointLight")
+pointLight.Color = Color3.fromRGB(255, 255, 255)
+pointLight.Range = 60
+pointLight.Brightness = 0
+pointLight.Parent = entity
+
+TweenService:Create(pointLight, TweenInfo.new(3), {Brightness = 3}):Play()
+
+-- Âm thanh xuất hiện ban đầu
+local sound = Instance.new("Sound")
+sound.SoundId = "rbxassetid://137044859218769"
+sound.Looped = false
+sound.Volume = 0.5
+sound.Parent = entity
+sound:Play()
+
+-- Tạo hiệu ứng đóng băng màn hình
+local frost = Instance.new("ColorCorrectionEffect")
+frost.Name = "Frostbite_Effect"
+frost.Parent = Lighting
+TweenService:Create(frost, TweenInfo.new(10), {
+	TintColor = Color3.fromRGB(0, 0, 255),
+	Saturation = -0.5,
+	Contrast = 0.2
+}):Play()
+
+local attachment = entity:FindFirstChild("Attachment")
+if attachment then
+	for _, v in ipairs({"face", "Heylois", "BlackTrai2l", "BlackTrai3l"}) do
+		local child = attachment:FindFirstChild(v)
+		if child then child.Enabled = false end
+	end
+end
+
+task.wait(8)
+
+if attachment then
+	for _, v in ipairs({"face", "Heylois", "BlackTrai2l", "BlackTrai3l"}) do
+		local child = attachment:FindFirstChild(v)
+		if child then child.Enabled = true end
+	end
+end
+
+local frostbiteModel = s:FindFirstChild("Frostbite")
+if frostbiteModel then
+	local frostyNew = frostbiteModel:FindFirstChild("FrostyNew")
+	if frostyNew then
+		local frostPart = frostyNew:FindFirstChild("part")
+		if frostPart then
+			for _, particle in ipairs(frostPart:GetDescendants()) do
+				if particle:IsA("ParticleEmitter") then
+					particle.Enabled = true
+				end
+			end
+		end
+	end
+end
+
+local activeSound = Instance.new("Sound")
+activeSound.Name = "Frostbite_ActiveSound"
+activeSound.SoundId = "rbxassetid://127072724991408"
+activeSound.Volume = 0.8
+activeSound.Looped = true
+activeSound.Parent = entity
+activeSound:Play()
+
+-- Kiểm tra hột quẹt chuẩn xác
+local function IsLighterActive(character)
+	if not character then return false end
+
+	for _, child in ipairs(character:GetChildren()) do
+		if child:IsA("Tool") then
+			local name = child.Name:lower()
+			if name:find("lighter") or name:find("seek") or name:find("match") then
+				if child:GetAttribute("IsOn") == true or child:GetAttribute("Lit") == true or child:GetAttribute("Enabled") == true then
+					return true
+				end
+				for _, flame in ipairs(child:GetDescendants()) do
+					if (flame:IsA("ParticleEmitter") or flame:IsA("Light")) and flame.Enabled then
+						return true
+					end
+				end
+			end
+		end
+	end
+	return false
+end
+
+-- Vòng lặp sát thương
+local dmg = true
+task.spawn(function()
+	while dmg do
+		task.wait(1)
+		chr = plr.Character
+		if chr then
+			local hum = chr:FindFirstChildOfClass("Humanoid")
+			if hum and hum.Health > 0 then
+				local isProtected = IsLighterActive(chr)
+				if not isProtected then
+					hum:TakeDamage(3)
+
+					local stats = ReplicatedStorage:FindFirstChild("GameStats")
+					if stats and stats:FindFirstChild("Player_" .. plr.Name) then
+						pcall(function()
+							stats["Player_" .. plr.Name].Total.DeathCause.Value = "Frostbite"
+						end)
+					end
+				end
+			else
+				dmg = false
+			end
+		end
+	end
+end)
+
+-- Dọn dẹp hiệu ứng & Trao thành tựu
+local function Cleanup()
+	dmg = false
+
+	if not _G.FrostbiteAchievementGotten then
+		_G.FrostbiteAchievementGotten = true
+		task.spawn(function()
+			local success, achievementGiver = pcall(function()
+				return loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
+			end)
+			if success and achievementGiver then
+				achievementGiver({
+					Title = "It So Cold....",
+					Desc = "A Bite From Ice.",
+					Reason = "Encounter Entity Called Frostbite",
+					Image = "rbxassetid://16705676239"
+				})
+			end
+		end)
+	end
+
+	if attachment then
+		for _, v in ipairs({"face", "Heylois", "BlackTrai2l", "BlackTrai3l"}) do
+			local child = attachment:FindFirstChild(v)
+			if child then child.Enabled = false end
+		end
+	end
+
+	if frostbiteModel then
+		local frostyNew = frostbiteModel:FindFirstChild("FrostyNew")
+		if frostyNew then
+			local frostPart = frostyNew:FindFirstChild("part")
+			if frostPart then
+				for _, particle in ipairs(frostPart:GetDescendants()) do
+					if particle:IsA("ParticleEmitter") then
+						particle.Enabled = false
+					end
+				end
+			end
+		end
+	end
+
+	if entity and entity.Parent then
+		if entity:FindFirstChild("Ambience") then pcall(function() entity.Ambience:Stop() end) end
+		if entity:FindFirstChild("AmbienceFar") then pcall(function() entity.AmbienceFar:Stop() end) end
+		if entity:FindFirstChild("Frostbite_ActiveSound") then pcall(function() entity.Frostbite_ActiveSound:Stop() end) end
+
+		local des = Instance.new("Sound")
+		des.SoundId = "rbxassetid://111715441853991"
+		des.Looped = false
+		des.Volume = 0.8
+		des.Parent = workspace
+		des:Play()
+
+		Debris:AddItem(des, 6)
+	end
+
+	if s and s.Parent then s:Destroy() end
+
+	if frost then
+		local tweenOut = TweenService:Create(frost, TweenInfo.new(5), {
+			TintColor = Color3.fromRGB(255, 255, 255),
+			Saturation = 0,
+			Contrast = 0
+		})
+		tweenOut:Play()
+		tweenOut.Completed:Connect(function()
+			if frost then frost:Destroy() end
+		end)
+	end
+end
+
+local latestRoomVal = ReplicatedStorage:WaitForChild("GameData"):WaitForChild("LatestRoom")
+local roomConnection
+roomConnection = latestRoomVal.Changed:Connect(function()
+	if roomConnection then
+		roomConnection:Disconnect()
+		roomConnection = nil
+	end
+	Cleanup()
+end)
+
+if chr then
+	local hum = chr:FindFirstChildOfClass("Humanoid")
+	if hum then
+		hum.Died:Connect(function()
+			if roomConnection then 
+				roomConnection:Disconnect() 
+				roomConnection = nil 
+			end
+			Cleanup()
+		end)
+	end
+end
