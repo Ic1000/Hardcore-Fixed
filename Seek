@@ -1,0 +1,203 @@
+local isSpawning = false 
+local currentCustomSeek = nil
+
+-- SECURE ASSET LOADING FUNCTION
+local function getCustomModel()
+    local assetId = "rbxassetid://70607186711183"
+    local model = nil
+    
+    -- Try Method 1: Standard GetObjects
+    local success, result = pcall(function()
+        return game:GetObjects(assetId)
+    end)
+    
+    if success and result and result[1] then
+        model = result[1]
+    else
+        -- Try Method 2: InsertService Fallback (Commonly used in modern executors)
+        local insertSuccess, insertResult = pcall(function()
+            return game:GetService("InsertService"):LoadAsset(11664451634)
+        end)
+        if insertSuccess and insertResult then
+            model = insertResult:FindFirstChildOfClass("Model") or insertResult:GetChildren()[1]
+        end
+    end
+    
+    return model
+end
+
+-- Instant execution function when Seek spawns
+local function handleSeekSpawn(seekMovingNewClone)
+    if isSpawning or not seekMovingNewClone then return end
+    isSpawning = true
+
+    local originalSeekRig = seekMovingNewClone:WaitForChild("SeekRig", 5)
+    if not originalSeekRig then 
+        isSpawning = false
+        return 
+    end
+
+    -- Clean up any leftover custom model from a previous room
+    if currentCustomSeek and currentCustomSeek.Parent then
+        currentCustomSeek:Destroy()
+    end
+
+    -- Fetch model using our multi-method loader
+    local customSeekAsset = getCustomModel()
+    if not customSeekAsset then
+        warn("CRITICAL: Failed to load custom Seek asset from Roblox servers.")
+        isSpawning = false
+        return
+    end
+
+    customSeekAsset.Name = "seek2"
+    currentCustomSeek = customSeekAsset
+
+    -- Quiet the custom asset's default sounds
+    if customSeekAsset:FindFirstChild("Figure") then
+        for _, child in pairs(customSeekAsset.Figure:GetChildren()) do
+            if child:IsA("Sound") then
+                child:Stop()
+            end
+        end
+    end
+
+    -- INSTANTLY hide the original game's Seek parts
+    for _, part in pairs(originalSeekRig:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.Transparency = 1
+            part.CanCollide = false
+        end
+    end
+
+    -- Actively watch the Head for the Eye/Black parts to spawn in and destroy them instantly
+    task.spawn(function()
+        local head = originalSeekRig:WaitForChild("Head", 5)
+        if head then
+            if head:FindFirstChild("Eye") then head.Eye:Destroy() end
+            if head:FindFirstChild("Black") then head.Black:Destroy() end
+            
+            local childAddedConnection
+            childAddedConnection = head.ChildAdded:Connect(function(child)
+                if child.Name == "Eye" or child.Name == "Black" then
+                    task.defer(function() child:Destroy() end)
+                end
+            end)
+            
+            seekMovingNewClone.Destroying:Connect(function()
+                if childAddedConnection then childAddedConnection:Disconnect() end
+            end)
+        end
+    end)
+
+    -- Parent the custom asset and configure its physics
+    customSeekAsset.Parent = workspace
+    local customSeekRig = customSeekAsset:FindFirstChild("SeekRig")
+    
+    if customSeekRig then
+        for _, part in pairs(customSeekRig:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+                part.Massless = true
+            end
+        end
+        if customSeekRig:FindFirstChild("Root") then
+            customSeekRig.Root.Anchored = true
+        end
+    end
+
+    -- Track loaded animations to avoid re-loading them every frame
+    local trackCache = {}
+
+    -- Main Position & KEYFRAME MIRROR Loop
+    task.spawn(function()
+        local originalAnimController = originalSeekRig:WaitForChild("AnimationController", 5)
+        local customAnimController = customSeekRig and customSeekRig:FindFirstChild("AnimationController")
+
+        while seekMovingNewClone and seekMovingNewClone.Parent and currentCustomSeek and currentCustomSeek.Parent and game:GetService("RunService").Heartbeat:Wait() do
+            -- 1. Sync Positions
+            if originalSeekRig and originalSeekRig:FindFirstChild("Root") and customSeekRig and customSeekRig:FindFirstChild("Root") then
+                customSeekRig.Root.CFrame = originalSeekRig.Root.CFrame
+            end
+
+            -- 2. Mirror Keyframes / Animations in Real Time
+            if originalAnimController and customAnimController then
+                local playingTracks = originalAnimController:GetPlayingAnimationTracks()
+                local currentlyActiveAnims = {}
+
+                for _, originalTrack in pairs(playingTracks) do
+                    local animId = originalTrack.Animation.AnimationId
+                    currentlyActiveAnims[animId] = true
+
+                    if not trackCache[animId] then
+                        local customTrack = customAnimController:LoadAnimation(originalTrack.Animation)
+                        customTrack:Play()
+                        trackCache[animId] = customTrack
+                    end
+
+                    local customTrack = trackCache[animId]
+                    if customTrack.IsPlaying then
+                        customTrack.TimePosition = originalTrack.TimePosition
+                        -- FIX: Used :AdjustSpeed() function call method format instead of a direct assignment variable rewrite
+                        customTrack:AdjustSpeed(originalTrack.Speed)
+                    end
+                end
+
+                for animId, customTrack in pairs(trackCache) do
+                    if not currentlyActiveAnims[animId] and customTrack.IsPlaying then
+                        customTrack:Stop(0)
+                    end
+                end
+            end
+
+            -- 3. Mute original sound loops
+            if seekMovingNewClone:FindFirstChild("Figure") then
+                if seekMovingNewClone.Figure:FindFirstChild("Footsteps") then seekMovingNewClone.Figure.Footsteps:Stop() end
+                if seekMovingNewClone.Figure:FindFirstChild("FootstepsFar") then seekMovingNewClone.Figure.FootstepsFar:Stop() end
+            end
+
+            -- 4. Maintain original invisibility
+            if originalSeekRig then
+                for _, part in pairs(originalSeekRig:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.Transparency = 1
+                    end
+                end
+            end
+        end
+    end)
+
+    pcall(function()
+        require(game.Players.LocalPlayer.PlayerGui.MainUI.Initiator.Main_Game)
+    end)
+
+    -- Handle Audio Timers independently
+    task.spawn(function()
+        if seekMovingNewClone:FindFirstChild("SeekMusic") then
+            repeat task.wait() until seekMovingNewClone.SeekMusic.IsPlaying == true
+        end
+        task.wait(9)
+        if customSeekAsset and customSeekAsset:FindFirstChild("Figure") then
+            local customFigure = customSeekAsset.Figure
+            if customFigure:FindFirstChild("FootstepsFar") then customFigure.FootstepsFar:Play() end
+            if customFigure:FindFirstChild("Footsteps") then customFigure.Footsteps:Play() end
+            if customFigure:FindFirstChild("Splashing") then customFigure.Splashing:Play() end
+            if customFigure:FindFirstChild("Splashing Far") then customFigure["Splashing Far"]:Play() end
+        end
+    end)
+
+    isSpawning = false
+end
+
+-- Monitor the workspace instantly for the model addition
+workspace.ChildAdded:Connect(function(child)
+    if child.Name == "SeekMovingNewClone" then
+        handleSeekSpawn(child)
+    end
+end)
+
+-- Backup check in case the script is executed exactly as he spawns
+local initialCheck = workspace:FindFirstChild("SeekMovingNewClone")
+if initialCheck then
+    handleSeekSpawn(initialCheck)
+end
