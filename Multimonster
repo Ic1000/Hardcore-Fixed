@@ -1,5 +1,5 @@
 --========================================================--
---                  SERVICES & KHAI BÁO TOÀN CỤC            --
+--     MULTIMONSTER + A-60 SMOOTH JUMPSCARE & RED TINT    --
 --========================================================--
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -16,75 +16,23 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local debounce = false
 local isJumpscaring = false
 local destroyedRooms = {}
+local totalRoomsBroken = 0 -- Biến đếm số lần phá hoại phòng
 
 -- Biến cho Model phụ tàn hình đi theo
 local extraModel = nil
 local followConnection = nil
 
--- CUSTOM SOUND GUIDING LIGHT & TỐC ĐỘ PHÁT
-local CUSTOM_GUIDING_SOUND = "79182044607177" 
-
-local GUIDING_SOUND_IDS = {
-	"9114223282",
-	"9125814524",
-	"10854271454",
-	"9844421112"
-}
-
-local function HandleGuidingSound(snd)
-	if snd:IsA("Sound") then
-		local function checkAndReplace()
-			local isGuiding = false
-			local lowerName = string.lower(snd.Name)
-			
-			if lowerName:find("guiding") then
-				isGuiding = true
-			else
-				for _, id in ipairs(GUIDING_SOUND_IDS) do
-					if string.find(snd.SoundId, id) then
-						isGuiding = true
-						break
-					end
-				end
-			end
-			
-			if isGuiding then
-				if snd.SoundId ~= CUSTOM_GUIDING_SOUND then
-					snd.SoundId = CUSTOM_GUIDING_SOUND
-				end
-				if snd.PlaybackSpeed ~= 0.55 then
-					snd.PlaybackSpeed = 0.55
-				end
-			end
-		end
-		
-		checkAndReplace()
-		snd:GetPropertyChangedSignal("SoundId"):Connect(checkAndReplace)
-		snd:GetPropertyChangedSignal("PlaybackSpeed"):Connect(function()
-			local lowerName = string.lower(snd.Name)
-			if (lowerName:find("guiding") or snd.SoundId == CUSTOM_GUIDING_SOUND) and snd.PlaybackSpeed ~= 0.55 then
-				snd.PlaybackSpeed = 0.55
-			end
-		end)
-	end
-end
-
-game.DescendantAdded:Connect(HandleGuidingSound)
-for _, des in ipairs(game:GetDescendants()) do
-	HandleGuidingSound(des)
-end
-
--- Asset Model ID
+-- Asset Model ID (Mô hình jumpscare A-60)
 local JUMPSCARE_MODEL_ID = "12263106166" 
 
--- DANH SÁCH ẢNH JUMPSCARE 2D
+-- DANH SÁCH ẢNH JUMPSCARE 2D (Chuẩn A-60 từ file bingu)
 local ALL_JUMPSCARE_IMAGES = {
-	"rbxassetid://114943702871183",
-	"rbxassetid://77042919484581",
-	"rbxassetid://113785746563976",
-	"rbxassetid://106324997569765",
-	"rbxassetid://93365716697080",
-	"rbxassetid://72735059720396"
+	"114943702871183",
+	"77042919484581",
+	"113785746563976",
+	"106324997569765",
+	"93365716697080",
+	"72735059720396"
 }
 
 --========================================================--
@@ -92,10 +40,15 @@ local ALL_JUMPSCARE_IMAGES = {
 --========================================================--
 local function GetGitSound(GithubSnd, SoundName)
 	if not isfile(SoundName .. ".mp3") then
-		writefile(SoundName .. ".mp3", game:HttpGet(GithubSnd))
+		pcall(function() writefile(SoundName .. ".mp3", game:HttpGet(GithubSnd)) end)
 	end
 	local sound = Instance.new("Sound")
-	sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
+	local assetFunc = getcustomasset or getsynasset
+	if assetFunc and pcall(function() assetFunc(SoundName .. ".mp3") end) then
+		sound.SoundId = assetFunc(SoundName .. ".mp3")
+	else
+		sound.SoundId = GithubSnd
+	end
 	return sound
 end
 
@@ -164,110 +117,109 @@ doorSound2.Volume = 3
 doorSound2.Parent = SoundService
 
 --========================================================--
--- ROOM OBJECT BREAK (ĐÃ SỬA LỖI API NETWORKEOWNERSHIP)
+-- ROOM OBJECT BREAK (LẦN ĐẦU FULL ÂM THANH, TỪ LẦN 2 RANDOM) --
 --========================================================--
 local function BreakRoom(room)
-	if room and not destroyedRooms[room] then
-		destroyedRooms[room] = true
-		
-		task.spawn(function()
-			task.wait(0.05)
+	if room then
+		local lastBreak = destroyedRooms[room] or 0
+		if tick() - lastBreak > 1.5 then
+			destroyedRooms[room] = tick()
+			totalRoomsBroken = totalRoomsBroken + 1
 			
-			local breakSound = Instance.new("Sound")
-			breakSound.SoundId = "rbxassetid://9114223171"
-			breakSound.Volume = 2.5
-			breakSound.Parent = room:FindFirstChild("Assets") or room
-			breakSound:Play()
-			breakSound.Ended:Connect(function() breakSound:Destroy() end)
+			task.spawn(function()
+				task.wait(0.05)
+				
+				local breakSound = Instance.new("Sound")
+				local breakSoundsList = {
+					"rbxassetid://9114223171",
+					"rbxassetid://9125992545", 
+					"rbxassetid://4004052860",
+					"rbxassetid://7142857558", 
+					"rbxassetid://7142843615",
+					"rbxassetid://2612674531", 
+					"rbxassetid://2174790942"
+				}
 
-			local assetContainer = room:FindFirstChild("Assets") or room
-			local breakSounds = {
-				"rbxassetid://9125992545",
-				"rbxassetid://4004052860",
-				"rbxassetid://7142857558",
-				"rbxassetid://7142843615",
-				"rbxassetid://7142857558",
-				"rbxassetid://2612674531",
-				"rbxassetid://2174790942"
-			}
+				-- Lần đầu tiên chạy: Kích full âm thanh phá hoại chính với âm lượng cực lớn
+				-- Lần thứ hai trở đi: Random một âm thanh bất kì trong danh sách
+				if totalRoomsBroken == 1 then
+					breakSound.SoundId = "rbxassetid://9114223171"
+					breakSound.Volume = 4.5 -- Full âm lượng tối đa cho lần đầu
+				else
+					breakSound.SoundId = breakSoundsList[math.random(1, #breakSoundsList)]
+					breakSound.Volume = math.random(25, 35) / 10
+				end
 
-			local blacklist = {"wardrobe", "bed", "rug", "key", "drawer", "book", "breaker", "table", "desk", "gold", "dresser"}
+				breakSound.Parent = room:FindFirstChild("Assets") or room
+				breakSound:Play()
+				breakSound.Ended:Connect(function() breakSound:Destroy() end)
 
-			for _, item in pairs(assetContainer:GetChildren()) do
-				if item:IsA("Model") and item.Name ~= "Door" and item.Name ~= "HidingSpots" then
-					
-					local isBlacklisted = false
-					local itemNameLower = string.lower(item.Name)
-					for _, word in ipairs(blacklist) do
-						if string.find(itemNameLower, word) then
-							isBlacklisted = true
-							break
-						end
-					end
+				local assetContainer = room:FindFirstChild("Assets") or room
+				local blacklist = {"wardrobe", "bed", "rug", "key", "drawer", "book", "breaker", "table", "desk", "gold", "dresser"}
 
-					if not isBlacklisted then
-						local soundParent = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart") or room
-						if soundParent then
-							local s = Instance.new("Sound")
-							s.SoundId = breakSounds[math.random(1, #breakSounds)]
-							s.Volume = math.random(20, 35) / 10
-							s.PlaybackSpeed = math.random(85, 115) / 100
-							s.RollOffMaxDistance = 100
-							s.Parent = soundParent
-							s:Play()
-							s.Ended:Connect(function() s:Destroy() end)
+				for _, item in pairs(assetContainer:GetChildren()) do
+					if item:IsA("Model") and item.Name ~= "Door" and item.Name ~= "HidingSpots" then
+						local isBlacklisted = false
+						local itemNameLower = string.lower(item.Name)
+						for _, word in ipairs(blacklist) do
+							if string.find(itemNameLower, word) then
+								isBlacklisted = true
+								break
+							end
 						end
 
-						local primary = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
-						if primary then
-							for _, v in ipairs(item:GetDescendants()) do
-								if v:IsA("BasePart") then
-									local lowerName = string.lower(v.Name)
-
-									if not string.find(lowerName, "floor") and not string.find(lowerName, "hitbox") then
-										v.Anchored = false
-										v.CanCollide = true
-
-										v.CustomPhysicalProperties = PhysicalProperties.new(
-											0.01,  
-											0.01,  
-											0.5,   
-											1,     
-											1      
-										)
-
-										pcall(function()
-											-- SỬA LỖI: Dùng GetCanSetNetworkOwnership() thay vì gọi trực tiếp CanSetNetworkOwnership()
-											if v:GetCanSetNetworkOwnership() then
-												v:SetNetworkOwner(LocalPlayer)
-											end
-										end)
-
-										v.CFrame = v.CFrame + Vector3.new(0, 0.05, 0)
-									end
-								end
+						if not isBlacklisted then
+							local soundParent = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart") or room
+							if soundParent then
+								local s = Instance.new("Sound")
+								s.SoundId = breakSoundsList[math.random(1, #breakSoundsList)]
+								s.Volume = (totalRoomsBroken == 1) and 3.5 or (math.random(20, 35) / 10)
+								s.PlaybackSpeed = math.random(85, 115) / 100
+								s.RollOffMaxDistance = 100
+								s.Parent = soundParent
+								s:Play()
+								s.Ended:Connect(function() s:Destroy() end)
 							end
 
-							primary.Anchored = true
-							task.wait()
-							primary.Anchored = false
+							local primary = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
+							if primary then
+								for _, v in ipairs(item:GetDescendants()) do
+									if v:IsA("BasePart") then
+										local lowerName = string.lower(v.Name)
+										if not string.find(lowerName, "floor") and not string.find(lowerName, "hitbox") then
+											v.Anchored = false
+											v.CanCollide = true
+											v.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0.01, 0.5, 1, 1)
+											pcall(function()
+												if v:GetCanSetNetworkOwnership() then
+													v:SetNetworkOwner(LocalPlayer)
+												end
+											end)
+											v.CFrame = v.CFrame + Vector3.new(0, 0.05, 0)
+										end
+									end
+								end
 
-							primary.AssemblyLinearVelocity = Vector3.new(
-								math.random(-60, 60),
-								math.random(20, 50),
-								math.random(-60, 60)
-							)
+								primary.Anchored = true
+								task.wait()
+								primary.Anchored = false
 
-							primary.AssemblyAngularVelocity = Vector3.new(
-								math.random(-25, 25),
-								math.random(-25, 25),
-								math.random(-25, 25)
-							)
+								primary.AssemblyLinearVelocity = Vector3.new(
+									math.random(-60, 60),
+									math.random(20, 50),
+									math.random(-60, 60)
+								)
+								primary.AssemblyAngularVelocity = Vector3.new(
+									math.random(-25, 25),
+									math.random(-25, 25),
+									math.random(-25, 25)
+								)
+							end
 						end
 					end
 				end
-			end
-		end)
+			end)
+		end
 	end
 end
 
@@ -305,16 +257,11 @@ local entity = spawner.Create({
 		HeightOffset = 0
 	},
 	Lights = {
-		Flicker = {
-			Enabled = false,
-			Duration = 1
-		},
+		Flicker = { Enabled = false, Duration = 1 },
 		Shatter = false,
 		Repair = false
 	},
-	Earthquake = {
-		Enabled = false
-	},
+	Earthquake = { Enabled = false },
 	CameraShake = {
 		Enabled = true,
 		Range = 150,
@@ -332,11 +279,7 @@ local entity = spawner.Create({
 		Max = math.random(5, 6),
 		Delay = math.random(1, 2)
 	},
-	Damage = {
-		Enabled = true,
-		Range = 40,
-		Amount = 150
-	},
+	Damage = { Enabled = false, Range = 0, Amount = 0 },
 	Crucifixion = {
 		Enabled = true,
 		Range = 10,
@@ -346,10 +289,10 @@ local entity = spawner.Create({
 	Death = {
 		Type = "Guiding",
 		Hints = {
-			"You died to an entity designated as A-60",
-			"It can appear at any moment, a loud scream will announce its presence",
-			"When you hear it spawn you must stay out of its reach as soon as possible",
-			"It knows exactly where you are so hiding in different places will not work.."
+			"You fell victim to Multimonster.",
+			"It travels at terrifying speeds across multiple rooms.",
+			"Listen closely for its loud approach and hide immediately.",
+			"Do not let it catch you in its line of sight!"
 		},
 		Cause = "multimonster"
 	}
@@ -392,22 +335,16 @@ entity:SetCallback("OnSpawned", function()
 	local attachment = object:WaitForChild("Main", 5)
 	local e = attachment and attachment:WaitForChild("Face", 5)
 	
-	if object:IsA("BasePart") then
-		object.CanCollide = false
-	end
+	if object:IsA("BasePart") then object.CanCollide = false end
 	if not e then return end
 	
 	local originalTexture = e.Texture
 	task.spawn(function()
 		local textures = {
-			"rbxassetid://12145534911",
-			"rbxassetid://12145554242",
-			"rbxassetid://12145599498",
-			"rbxassetid://12145599275",
-			"rbxassetid://12155335619",
-			"rbxassetid://12145598814",
-			"rbxassetid://12146135062",
-			"rbxassetid://11378285585"
+			"rbxassetid://12145534911", "rbxassetid://12145554242",
+			"rbxassetid://12145599498", "rbxassetid://12145599275",
+			"rbxassetid://12155335619", "rbxassetid://12145598814",
+			"rbxassetid://12146135062", "rbxassetid://11378285585"
 		}
 		while part and part.Parent do
 			if isJumpscaring then
@@ -440,9 +377,7 @@ entity:SetCallback("OnStartMoving", function()
 			if not humanoid or humanoid.Health <= 0 then
 				if womp then
 					for _, snd in ipairs(womp:GetDescendants()) do
-						if snd:IsA("Sound") then
-							snd:Stop()
-						end
+						if snd:IsA("Sound") then snd:Stop() end
 					end
 				end
 				break
@@ -471,9 +406,7 @@ entity:SetCallback("OnStartMoving", function()
 					local jumpscareModel = nil
 					
 					pcall(function()
-						if HumanoidRootPart then
-							HumanoidRootPart.Anchored = true
-						end
+						if HumanoidRootPart then HumanoidRootPart.Anchored = true end
 						
 						local lockedCFrame = camera.CFrame
 						camera.CameraType = Enum.CameraType.Scriptable
@@ -512,9 +445,7 @@ entity:SetCallback("OnStartMoving", function()
 							end
 						else
 							jumpscareModel = wompwomp
-							if jumpscareModel:IsA("BasePart") then
-								jumpscareModel.Anchored = true
-							end
+							if jumpscareModel:IsA("BasePart") then jumpscareModel.Anchored = true end
 						end
 						
 						local CameraShakerModule = require(ReplicatedStorage:WaitForChild("CameraShaker"))
@@ -522,24 +453,27 @@ entity:SetCallback("OnStartMoving", function()
 							camera.CFrame = lockedCFrame * shakeCf
 						end)
 						jumpCamShake:Start()
-						jumpCamShake:ShakeOnce(10, 10, 0, 5.5, 1, 0)
+						jumpCamShake:ShakeOnce(25, 25, 0, 4, 90, 60)
 						
+						-- Cơ chế Lerp model Jumpscare áp sát camera mượt mà
+						local vector3Offset = Vector3.new(0, -1.2, -5)
+						local lerpSpeed = 0.8
 						lockCFrameConnection = RunService.RenderStepped:Connect(function()
 							if not isJumpscaring then return end
 							camera.CameraType = Enum.CameraType.Scriptable
 							if jumpscareModel then
-								local targetCFrame = camera.CFrame * CFrame.new(0, -0.5, -4.5)
+								local targetCF = camera.CFrame * CFrame.new(vector3Offset)
 								if jumpscareModel:IsA("Model") then
-									jumpscareModel:PivotTo(targetCFrame)
+									jumpscareModel:PivotTo(jumpscareModel:GetPivot():Lerp(targetCF, lerpSpeed))
 								elseif jumpscareModel:IsA("BasePart") then
-									jumpscareModel.CFrame = targetCFrame
+									jumpscareModel.CFrame = jumpscareModel.CFrame:Lerp(targetCF, lerpSpeed)
 								end
 							end
 						end)
 						
 						local scareSound = GetGitSound("https://github.com/thefigureblack/audios/blob/main/asixtyScareOmg.mp3?raw=true", "asixtyScareOmg")
 						scareSound.Parent = Workspace
-						scareSound.Volume = 5
+						scareSound.Volume = 6
 						scareSound:Play()
 						
 						task.wait(0.5)
@@ -548,15 +482,11 @@ entity:SetCallback("OnStartMoving", function()
 							lockCFrameConnection:Disconnect()
 							lockCFrameConnection = nil
 						end
-						if jumpCamShake then
-							jumpCamShake:Stop()
-						end
+						if jumpCamShake then jumpCamShake:Stop() end
 						
 						camera.CameraType = Enum.CameraType.Custom
 						local humanoidObj = character:FindFirstChildOfClass("Humanoid")
-						if humanoidObj then
-							camera.CameraSubject = humanoidObj
-						end
+						if humanoidObj then camera.CameraSubject = humanoidObj end
 						if HumanoidRootPart then
 							camera.CFrame = CFrame.new(camera.CFrame.Position, HumanoidRootPart.Position + HumanoidRootPart.CFrame.LookVector * 100)
 						end
@@ -576,45 +506,82 @@ entity:SetCallback("OnStartMoving", function()
 							end
 						end
 						
+						-- ==========================================
+						-- GIAO DIỆN JUMPSCARE 2D CHUẨN A-60 + TỰ ĐỘNG DỌN DẸP
+						-- ==========================================
 						local screenGui = Instance.new("ScreenGui")
-						screenGui.Name = "A60_JumpscareGui"
+						screenGui.Name = "RandomImageGui"
 						screenGui.Parent = player:WaitForChild("PlayerGui")
 						screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-						
-						local randomSelectedImage = ALL_JUMPSCARE_IMAGES[math.random(1, #ALL_JUMPSCARE_IMAGES)]
-						local jumpscareImg = Instance.new("ImageLabel")
-						jumpscareImg.Name = "JumpscareImage"
-						jumpscareImg.Parent = screenGui
-						jumpscareImg.AnchorPoint = Vector2.new(0.5, 0.5)
-						jumpscareImg.Position = UDim2.new(0.5, 0, 0.5, 0)
-						jumpscareImg.Size = UDim2.new(0, 0, 0, 0)
-						jumpscareImg.BackgroundTransparency = 1
-						jumpscareImg.Image = randomSelectedImage
-						jumpscareImg.ImageTransparency = 0
-						
+						screenGui.IgnoreGuiInset = true
+
+						local function getRandomImageId()
+							return ALL_JUMPSCARE_IMAGES[math.random(1, #ALL_JUMPSCARE_IMAGES)]
+						end
+
+						local imageLabel = Instance.new("ImageLabel")
+						imageLabel.Size = UDim2.new(0, 0, 0, 0)
+						imageLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+						imageLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+						imageLabel.BackgroundColor3 = Color3.new(1, 0, 0)
+						imageLabel.BackgroundTransparency = 1 
+						imageLabel.Image = "rbxassetid://" .. getRandomImageId()
+						imageLabel.ImageTransparency = 1
+						imageLabel.Parent = screenGui
+
 						local colorCorrection = Instance.new("ColorCorrectionEffect", Lighting)
-						TweenService:Create(colorCorrection, TweenInfo.new(0.2), {
+						TweenService:Create(colorCorrection, TweenInfo.new(0.5), {
 							Brightness = 0.2,
-							Contrast = 0.3,
-							Saturation = -0.3,
+							Contrast = 0.2,
+							Saturation = -0.2,
 							TintColor = Color3.fromRGB(255, 0, 4),
 						}):Play()
 						
-						if HumanoidRootPart then
-							HumanoidRootPart.Anchored = false
-						end
-                            humanoid.health = 0
-						-- Đã xóa dòng lỗi entity.Config... ở đây vì spawner v2 không hỗ trợ
+						if HumanoidRootPart then HumanoidRootPart.Anchored = false end
 						
-						TweenService:Create(jumpscareImg, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-							Size = UDim2.new(1.2, 0, 1.4, 0),
-							Rotation = math.random(-25, 25)
-						}):Play()
+						-- Đồng bộ DeathHint và nguyên nhân cái chết
+						pcall(function()
+							local remoteFolder = ReplicatedStorage:FindFirstChild("RemotesFolder")
+							if remoteFolder and remoteFolder:FindFirstChild("DeathHint") and firesignal then
+								firesignal(remoteFolder.DeathHint.OnClientEvent, {
+									"You fell victim to Multimonster.",
+									"It travels at terrifying speeds across multiple rooms.",
+									"Listen closely for its loud approach and hide immediately.",
+									"Do not let it catch you in its line of sight!"
+								}, "Blue", "multimonster")
+							end
+						end)
+						
+						local statsFolder = ReplicatedStorage:FindFirstChild("GameStats")
+						if statsFolder then
+							local playerStats = statsFolder:FindFirstChild("Player_" .. player.Name)
+							if playerStats and playerStats:FindFirstChild("Total") and playerStats.Total:FindFirstChild("DeathCause") then
+								playerStats.Total.DeathCause.Value = "multimonster"
+							end
+						end
+
+						humanoid.Health = 0
+						
+						-- Hiệu ứng Tween phóng to, xoay và hiện ảnh đập vào mặt
+						local GetTimeSpeed = TweenInfo.new(0.28, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+						local Anim = TweenService:Create(imageLabel, GetTimeSpeed, {Size = UDim2.new(0, 580, 0, 580)})
+						local rot = TweenService:Create(imageLabel, GetTimeSpeed, {Rotation = 18})
+						local tran = TweenService:Create(imageLabel, GetTimeSpeed, {ImageTransparency = 0})
+
+						Anim:Play()
+						tran:Play()
+						rot:Play()
 						
 						task.wait(0.5)
 						isJumpscaring = false
 						
-						TweenService:Create(jumpscareImg, TweenInfo.new(3.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { ImageTransparency = 1 }):Play()
+						Anim.Completed:Wait()
+						wait(0.8)
+						
+						-- Tạo hiệu ứng mờ dần rồi tự động hủy (Destroy)
+						local fadeTween = TweenService:Create(imageLabel, TweenInfo.new(0.75), {ImageTransparency = 1})
+						fadeTween:Play()
+						
 						TweenService:Create(colorCorrection, TweenInfo.new(0.5), {
 							Brightness = 0,
 							Contrast = 0,
@@ -622,9 +589,13 @@ entity:SetCallback("OnStartMoving", function()
 							TintColor = Color3.fromRGB(255, 255, 255),
 						}):Play()
 						
-						Debris:AddItem(screenGui, 2.5)
-						Debris:AddItem(colorCorrection, 2.5)
-						Debris:AddItem(scareSound, 2.5)
+						fadeTween.Completed:Connect(function()
+							screenGui:Destroy()
+						end)
+						
+						Debris:AddItem(screenGui, 6)
+						Debris:AddItem(colorCorrection, 3)
+						Debris:AddItem(scareSound, 3)
 						
 						task.spawn(function()
 							local postShake = CameraShakerModule.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
@@ -637,7 +608,6 @@ entity:SetCallback("OnStartMoving", function()
 								postShake:ShakeOnce(14, 20, 0.05, 0.1)
 								task.wait(0.1)
 							end
-							
 							postShake:Stop()
 						end)
 						
