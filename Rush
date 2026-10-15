@@ -1,0 +1,34 @@
+-- Define the globals
+local workspaceService = game:GetService("Workspace")
+local running = true -- Set to true by default so the loop starts running
+
+local function OnRushSpawned(model)
+    print("Rush detected:", model.Name)
+    task.wait(0.5)
+    local rushNew = workspaceService:WaitForChild("RushMoving"):WaitForChild("RushNew")
+    rushNew.Attachment.ParticleEmitter.Texture = "rbxassetid://110126453570502"
+    rushNew.PlaySound.PlaybackSpeed = 0.15
+    rushNew.Footsteps.PlaybackSpeed = 0.15
+    
+    workspaceService.RushMoving.RushNew.Attachment.BlackTrail.Texture = "rbxassetid://390410785"
+end
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if running then
+            local rush = workspaceService:FindFirstChild("RushMoving")
+            if rush and rush:IsA("Model") then
+                running = false
+                task.spawn(function()
+                    OnRushSpawned(rush)
+                end)
+                repeat
+                    task.wait(0.1)
+                    rush = workspaceService:FindFirstChild("RushMoving")
+                until not rush
+                running = true
+                print("Rush gone, loop resumed")
+            end
+        end
+    end
+end)
