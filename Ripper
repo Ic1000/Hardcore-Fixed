@@ -261,15 +261,8 @@ local function BreakRoom(room)
 											)
 
 										pcall(function()
-
-											if part:CanSetNetworkOwnership() then
-												part:SetNetworkOwner(
-													LocalPlayer
-												)
-											end
-
-										end)
-
+    part:SetNetworkOwner(LocalPlayer)
+end)
 										part.CFrame =
 											part.CFrame +
 											Vector3.new(0, 0.05, 0)
@@ -398,8 +391,8 @@ local function SpawnRipper()
 
 			Entity = {
 				Name = "Ripper Entity",
-				Asset = "89134303045466",
-				HeightOffset = 0
+				Asset = "rbxassetid://12272798431",
+				HeightOffset = -4.5
 			},
 
 			Lights = {
@@ -489,7 +482,7 @@ local function SpawnRipper()
 
 				Enabled = true,
 				KillOnMove = false,
-				Range = 80,
+				Range = 40,
 				Amount = 125,
 				IgnoreHiding = false,
 
@@ -530,7 +523,7 @@ local function SpawnRipper()
 
 			Crucifixion = {
 				Enabled = true,
-				Range = 40,
+				Range = 45,
 				Resist = false,
 				Break = true
 			},
@@ -854,17 +847,3 @@ end)
 --========================================================--
 -- READY
 --========================================================--
-
-print("--------------------------------")
-print("       RIPPER ONE TIME READY")
-print("--------------------------------")
-print("Chance : DISABLED")
-print("Random : DISABLED")
-print("Initial Spawn : OFF")
-print("First New Room : SPAWN")
-print("Maximum Spawn : 1")
-print("Achievement : EXACTLY ONCE PER SESSION")
-print("Custom Red Lighting : ACTIVE")
-print("Auto Open Door on Despawn: ACTIVE")
-print("Door Sound 3 on Despawn: ACTIVE")
-print("--------------------------------")
