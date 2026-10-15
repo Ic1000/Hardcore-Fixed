@@ -1,0 +1,344 @@
+workspace.DescendantAdded:Connect(function(figu)
+	if figu.Name == "FigureRig" and not figu:GetAttribute("AlreadyExist") and not (game.ReplicatedStorage.GameData.Floor == Fools) then
+		local figure = game:GetObjects("rbxassetid://12787753722")[1]
+		figure:FindFirstChild("Blood"):Destroy()
+		figure:FindFirstChild("Blood2"):Destroy()
+		figure:FindFirstChild("Animations"):Destroy()
+		figure.Name = "FigureMod"
+		figure:FindFirstChild("Root").Anchored = true
+		figure:FindFirstChild("Head"):FindFirstChild("FakeHead"):FindFirstChild("Dust").CanCollide = false
+		figure.Parent = figu.Parent
+		figu:SetAttribute("AlreadyExist", true)
+
+		local mainHumanoid = figu:WaitForChild("Figurenoid")
+		local mainAnimator = mainHumanoid:WaitForChild("Animator")
+		local RunService = game:GetService("RunService")
+
+		local targetHumanoid = figure:WaitForChild("Humanoid")
+		local targetAnimator = targetHumanoid:WaitForChild("Animator")
+		local mainRoot = figu:WaitForChild("Root")
+		local targetRoot = figure:WaitForChild("Root")
+		
+		figu:WaitForChild("Head"):WaitForChild("Growl").PlaybackSpeed = 1.1
+		figu:WaitForChild("Head"):WaitForChild("Click").PlaybackSpeed = 0.65
+		figu:WaitForChild("Head"):WaitForChild("ClickLow").PlaybackSpeed = figure:WaitForChild("Head"):WaitForChild("ClickLow").PlaybackSpeed
+		figu:WaitForChild("Head"):WaitForChild("ClickLow").Volume = figure:WaitForChild("Head"):WaitForChild("ClickLow").Volume
+		figu:WaitForChild("Head"):WaitForChild("ClickLow").SoundId = figure:WaitForChild("Head"):WaitForChild("ClickLow").SoundId
+		spawn(function()
+			figu:WaitForChild("Head"):WaitForChild("Click").Played:Wait()
+			while figu and wait(30) do
+				figure:FindFirstChild("Head"):FindFirstChild("ClickLow"):Play()
+			end
+		end)
+		for _, instasnr in pairs({figu:WaitForChild("Head"):WaitForChild("Growl"), figu:WaitForChild("Head"):WaitForChild("Click"), figu:WaitForChild("Head"):WaitForChild("ClickLow")}) do
+			for _, child in pairs(instasnr:GetChildren()) do
+				child:Destroy()
+			end
+		end
+		for _, chil2d in pairs(figure:WaitForChild("Head"):WaitForChild("Growl"):GetChildren()) do
+			local copy = chil2d:Clone()
+			copy.Parent = figu:WaitForChild("Head"):WaitForChild("Growl")
+		end
+		for _, chil3d in pairs(figure:WaitForChild("Head"):WaitForChild("Click"):GetChildren()) do
+			local copy2 = chil3d:Clone()
+			copy2.Parent = figu:WaitForChild("Head"):WaitForChild("Click")
+		end
+		for _, chil4d in pairs(figure:WaitForChild("Head"):WaitForChild("ClickLow"):GetChildren()) do
+			local copy3 = chil4d:Clone()
+			copy3.Parent = figu:WaitForChild("Head"):WaitForChild("ClickLow")
+		end
+		local sounddefct = Instance.new("PitchShiftSoundEffect")
+		sounddefct.Octave = 0.5
+		sounddefct.Parent = figu:WaitForChild("Head"):WaitForChild("Growl")
+		
+		figu:WaitForChild("LeftFoot"):WaitForChild("Footstep").PlaybackSpeed = 0.6
+		figu:WaitForChild("LeftFoot"):WaitForChild("FootstepLow").PlaybackSpeed = 0.6
+		figu:WaitForChild("RightFoot"):WaitForChild("Footstep").PlaybackSpeed = 0.7
+		figu:WaitForChild("LeftFoot"):WaitForChild("FootstepLow").PlaybackSpeed = 0.7
+		figu:WaitForChild("LeftFoot").ChildAdded:Connect(function(footsnd)
+			pcall(function()
+				if footsnd:IsA("Sound") and footsnd.Name == "_footstepClone" then
+					footsnd.PlaybackSpeed = 0.6
+				end
+			end)
+		end)
+		figu:WaitForChild("RightFoot").ChildAdded:Connect(function(footsnd2)
+			pcall(function()
+				if footsnd2:IsA("Sound") and footsnd2.Name == "_footstepClone" then
+					footsnd2.PlaybackSpeed = 0.7
+				end
+			end)
+		end)
+		
+		targetRoot.CFrame = mainRoot.CFrame
+		
+		local Runsv
+		
+		Runsv = RunService.Heartbeat:Connect(function()
+			targetRoot.CFrame = mainRoot.CFrame
+			for _, part in pairs(figu:GetDescendants()) do
+				if part:IsA("BasePart") then
+					if part.Transparency < 1 then
+						part.Transparency = 1
+					end
+				end
+			end
+			for _, par2t in pairs(figure:GetDescendants()) do
+				if par2t:IsA("BasePart") then
+					if par2t.CanCollide == true then
+						par2t.CanCollide = false
+					end
+				end
+			end
+			local playingTracks = mainAnimator:GetPlayingAnimationTracks()
+			local targetTracks = targetAnimator:GetPlayingAnimationTracks()
+			
+			for _, targetTrack in pairs(targetTracks) do
+				local isPlaying = false
+				for _, mainTrack in pairs(playingTracks) do
+					if mainTrack.Animation.AnimationId == targetTrack.Animation.AnimationId then
+						isPlaying = true
+						break
+					end
+				end
+				if not isPlaying then
+					targetTrack:Stop(0.3)
+				end
+			end
+			
+			for _, mainTrack in pairs(playingTracks) do
+				local animId = mainTrack.Animation.AnimationId
+				local targetTrack = nil
+				
+				for _, track in pairs(targetTracks) do
+					if track.Animation.AnimationId == animId then
+						targetTrack = track
+						break
+					end
+				end
+				
+				if not targetTrack then
+					targetTrack = targetAnimator:LoadAnimation(mainTrack.Animation)
+					targetTrack:Play(0.3)
+				end
+				
+				targetTrack:AdjustSpeed(mainTrack.Speed)
+				targetTrack:AdjustWeight(mainTrack.WeightTarget, 0.3)
+				if math.abs(targetTrack.TimePosition - mainTrack.TimePosition) > 0.05 then
+					targetTrack.TimePosition = mainTrack.TimePosition
+				end
+			end
+		end)
+		
+		figu.Destroying:Connect(function()
+			figure:Destroy()
+			Runsv:Disconnect()
+		end)
+	end
+	if figu.Name == "FigureFirst" or figu.Name == "FigureElevator" or figu.Name == "FigureLibrary" and not (game.ReplicatedStorage.GameData.Floor == Fools) then
+		local figure = game:GetObjects("rbxassetid://12787753722")[1]
+		figure:FindFirstChild("Blood"):Destroy()
+		figure:FindFirstChild("Blood2"):Destroy()
+		figure:FindFirstChild("Animations"):Destroy()
+		figure.Name = "FigureMod2"
+		figure:FindFirstChild("Root").Anchored = true
+		figure:FindFirstChild("Head"):FindFirstChild("FakeHead"):FindFirstChild("Dust").CanCollide = false
+		figure.Parent = figu.Parent
+		figu:SetAttribute("AlreadyExist", true)
+
+		local mainAnimator = figu:WaitForChild("AnimationController")
+
+		local targetHumanoid = figure:WaitForChild("Humanoid")
+		local targetAnimator = targetHumanoid:WaitForChild("Animator")
+		local mainRoot = figu:WaitForChild("Root")
+		local targetRoot = figure:WaitForChild("Root")
+		local RunService = game:GetService("RunService")
+		
+		figu:WaitForChild("Head"):WaitForChild("Growl").PlaybackSpeed = 1.1
+		figu:WaitForChild("Head"):WaitForChild("Click").PlaybackSpeed = 0.65
+		for _, instasnr in pairs({figu:WaitForChild("Head"):WaitForChild("Growl"), figu:WaitForChild("Head"):WaitForChild("Click")}) do
+			for _, child in pairs(instasnr:GetChildren()) do
+				child:Destroy()
+			end
+		end
+		for _, chil2d in pairs(figure:WaitForChild("Head"):WaitForChild("Growl"):GetChildren()) do
+			local copy = chil2d:Clone()
+			copy.Parent = figu:WaitForChild("Head"):WaitForChild("Growl")
+		end
+		for _, chil3d in pairs(figure:WaitForChild("Head"):WaitForChild("Click"):GetChildren()) do
+			local copy2 = chil3d:Clone()
+			copy2.Parent = figu:WaitForChild("Head"):WaitForChild("Click")
+		end
+		local sounddefct = Instance.new("PitchShiftSoundEffect")
+		sounddefct.Octave = 0.5
+		sounddefct.Parent = figu:WaitForChild("Head"):WaitForChild("Growl")
+		
+		targetRoot.CFrame = mainRoot.CFrame
+		
+		local Runsv
+		
+		Runsv = RunService.Heartbeat:Connect(function()
+			targetRoot.CFrame = mainRoot.CFrame
+			for _, part in pairs(figu:GetDescendants()) do
+				if part:IsA("BasePart") then
+					if part.Transparency < 1 then
+						part.Transparency = 1
+					end
+				end
+			end
+			for _, par2t in pairs(figure:GetDescendants()) do
+				if par2t:IsA("BasePart") then
+					if par2t.CanCollide == true then
+						par2t.CanCollide = false
+					end
+				end
+			end
+			local playingTracks = mainAnimator:GetPlayingAnimationTracks()
+			local targetTracks = targetAnimator:GetPlayingAnimationTracks()
+			
+			for _, targetTrack in pairs(targetTracks) do
+				local isPlaying = false
+				for _, mainTrack in pairs(playingTracks) do
+					if mainTrack.Animation.AnimationId == targetTrack.Animation.AnimationId then
+						isPlaying = true
+						break
+					end
+				end
+				if not isPlaying then
+					targetTrack:Stop(0.3)
+				end
+			end
+			
+			for _, mainTrack in pairs(playingTracks) do
+				local animId = mainTrack.Animation.AnimationId
+				local targetTrack = nil
+				
+				for _, track in pairs(targetTracks) do
+					if track.Animation.AnimationId == animId then
+						targetTrack = track
+						break
+					end
+				end
+				
+				if not targetTrack then
+					targetTrack = targetAnimator:LoadAnimation(mainTrack.Animation)
+					targetTrack:Play(0.3)
+				end
+				
+				targetTrack:AdjustSpeed(mainTrack.Speed)
+				targetTrack:AdjustWeight(mainTrack.WeightTarget, 0.3)
+				if math.abs(targetTrack.TimePosition - mainTrack.TimePosition) > 0.05 then
+					targetTrack.TimePosition = mainTrack.TimePosition
+				end
+			end
+		end)
+		
+		figu.Destroying:Connect(function()
+			figure:Destroy()
+			Runsv:Disconnect()
+		end)
+	end
+	if figu.Name == "Figure" and not figu.Parent == SeekMovingNewClone and not (game.ReplicatedStorage.GameData.Floor == Fools) then
+		local figure = game:GetObjects("rbxassetid://12787753722")[1]
+		figure:FindFirstChild("Blood"):Destroy()
+		figure:FindFirstChild("Blood2"):Destroy()
+		figure:FindFirstChild("Animations"):Destroy()
+		figure.Name = "FigureMod3"
+		figure:FindFirstChild("Root").Anchored = true
+		figure:FindFirstChild("Head"):FindFirstChild("FakeHead"):FindFirstChild("Dust").CanCollide = false
+		figure.Parent = figu.Parent
+		figu:SetAttribute("AlreadyExist", true)
+
+		local mainAnimator = figu:WaitForChild("AnimationController")
+
+		local targetHumanoid = figure:WaitForChild("Humanoid")
+		local targetAnimator = targetHumanoid:WaitForChild("Animator")
+		local mainRoot = figu:WaitForChild("Root")
+		local targetRoot = figure:WaitForChild("Root")
+		local RunService = game:GetService("RunService")
+		
+		figu:WaitForChild("Head"):WaitForChild("Growl").PlaybackSpeed = 1.1
+		figu:WaitForChild("Head"):WaitForChild("Click").PlaybackSpeed = 0.65
+		for _, instasnr in pairs({figu:WaitForChild("Head"):WaitForChild("Growl"), figu:WaitForChild("Head"):WaitForChild("Click")}) do
+			for _, child in pairs(instasnr:GetChildren()) do
+				child:Destroy()
+			end
+		end
+		for _, chil2d in pairs(figure:WaitForChild("Head"):WaitForChild("Growl"):GetChildren()) do
+			local copy = chil2d:Clone()
+			copy.Parent = figu:WaitForChild("Head"):WaitForChild("Growl")
+		end
+		for _, chil3d in pairs(figure:WaitForChild("Head"):WaitForChild("Click"):GetChildren()) do
+			local copy2 = chil3d:Clone()
+			copy2.Parent = figu:WaitForChild("Head"):WaitForChild("Click")
+		end
+		local sounddefct = Instance.new("PitchShiftSoundEffect")
+		sounddefct.Octave = 0.5
+		sounddefct.Parent = figu:WaitForChild("Head"):WaitForChild("Growl")
+		
+		targetRoot.CFrame = mainRoot.CFrame
+		
+		local Runsv
+		
+		Runsv = RunService.Heartbeat:Connect(function()
+			targetRoot.CFrame = mainRoot.CFrame
+			for _, part in pairs(figu:GetDescendants()) do
+				if part:IsA("BasePart") then
+					if part.Transparency < 1 then
+						part.Transparency = 1
+					end
+				end
+			end
+			for _, par2t in pairs(figure:GetDescendants()) do
+				if par2t:IsA("BasePart") then
+					if par2t.CanCollide == true then
+						par2t.CanCollide = false
+					end
+				end
+			end
+			local playingTracks = mainAnimator:GetPlayingAnimationTracks()
+			local targetTracks = targetAnimator:GetPlayingAnimationTracks()
+			
+			for _, targetTrack in pairs(targetTracks) do
+				local isPlaying = false
+				for _, mainTrack in pairs(playingTracks) do
+					if mainTrack.Animation.AnimationId == targetTrack.Animation.AnimationId then
+						isPlaying = true
+						break
+					end
+				end
+				if not isPlaying then
+					targetTrack:Stop(0.3)
+				end
+			end
+			
+			for _, mainTrack in pairs(playingTracks) do
+				local animId = mainTrack.Animation.AnimationId
+				local targetTrack = nil
+				
+				for _, track in pairs(targetTracks) do
+					if track.Animation.AnimationId == animId then
+						targetTrack = track
+						break
+					end
+				end
+				
+				if not targetTrack then
+					targetTrack = targetAnimator:LoadAnimation(mainTrack.Animation)
+					targetTrack:Play(0.3)
+				end
+				
+				targetTrack:AdjustSpeed(mainTrack.Speed)
+				targetTrack:AdjustWeight(mainTrack.WeightTarget, 0.3)
+				if math.abs(targetTrack.TimePosition - mainTrack.TimePosition) > 0.05 then
+					targetTrack.TimePosition = mainTrack.TimePosition
+				end
+			end
+		end)
+		
+		figu.Destroying:Connect(function()
+			figure:Destroy()
+			Runsv:Disconnect()
+		end)
+	end
+end)
