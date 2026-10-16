@@ -44,8 +44,8 @@ local function SafeGiveBadge()
 end
 
 --// LOAD MODEL
-local fileName = "shockerasdasdasd.rbxm"
-local rawUrl = "https://github.com/reboundplayz/Doors-Fixed-Modes/raw/refs/heads/main/shockersdasda.rbxm"
+local fileName = "shocker_fixed_v3.rbxm"
+local rawUrl = "https://raw.githubusercontent.com/junin724/remake/main/shocker.rbxm"
 
 -- Se o arquivo não existe ou está vazio (0 bytes), tenta baixar
 if not isfile(fileName) or (isfile(fileName) and #readfile(fileName) == 0) then
