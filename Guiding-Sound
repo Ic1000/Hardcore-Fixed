@@ -1,0 +1,31 @@
+local filename = "hardcore_music_guiding_light.mp3"
+local url = "https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/main/Hardcore%20Guiding.mp3"
+
+-- Check if the file doesn't exist, then download it
+if not isfile(filename) then
+    local success, response = pcall(function()
+        return game:HttpGet(url)
+    end)
+    
+    if success and response then
+        writefile(filename, response)
+    else
+        warn("Failed to download the music file.")
+        return -- Stops execution if the download fails to prevent further errors
+    end
+end
+
+-- Get the custom asset string
+local asset = getcustomasset(filename)
+
+-- Safely path to the Blue/Guiding Light music object
+local localPlayer = game.Players.LocalPlayer
+local playerGui = localPlayer:WaitForChild("PlayerGui")
+local healthMusic = playerGui:WaitForChild("MainUI"):WaitForChild("Initiator"):WaitForChild("Main_Game"):WaitForChild("Health"):WaitForChild("Music"):WaitForChild("Blue")
+
+-- Apply the custom asset and replay if it's already playing
+healthMusic.SoundId = asset
+if healthMusic.IsPlaying then
+    healthMusic:Stop()
+    healthMusic:Play()
+end
