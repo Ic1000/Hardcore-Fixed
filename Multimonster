@@ -1,5 +1,5 @@
 --========================================================--
---     MULTIMONSTER + A-60 SMOOTH JUMPSCARE & RED TINT    --
+--                  SERVICES & KHAI BÁO TOÀN CỤC            --
 --========================================================--
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -16,23 +16,23 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local debounce = false
 local isJumpscaring = false
 local destroyedRooms = {}
-local totalRoomsBroken = 0 -- Biến đếm số lần phá hoại phòng
+local totalRoomsBroken = 0 -- Biến đếm số lần phá phòng
 
 -- Biến cho Model phụ tàn hình đi theo
 local extraModel = nil
 local followConnection = nil
 
--- Asset Model ID (Mô hình jumpscare A-60)
+-- Asset Model ID
 local JUMPSCARE_MODEL_ID = "12263106166" 
 
--- DANH SÁCH ẢNH JUMPSCARE 2D (Chuẩn A-60 từ file bingu)
+-- DANH SÁCH ẢNH JUMPSCARE 2D
 local ALL_JUMPSCARE_IMAGES = {
-	"114943702871183",
-	"77042919484581",
-	"113785746563976",
-	"106324997569765",
-	"93365716697080",
-	"72735059720396"
+	"rbxassetid://114943702871183",
+	"rbxassetid://77042919484581",
+	"rbxassetid://113785746563976",
+	"rbxassetid://106324997569765",
+	"rbxassetid://93365716697080",
+	"rbxassetid://72735059720396"
 }
 
 --========================================================--
@@ -117,7 +117,7 @@ doorSound2.Volume = 3
 doorSound2.Parent = SoundService
 
 --========================================================--
--- ROOM OBJECT BREAK (LẦN ĐẦU FULL ÂM THANH, TỪ LẦN 2 RANDOM) --
+-- ROOM OBJECT BREAK (LẦN 1 FULL ÂM THANH, LẦN 2 TRỞ ĐI RANDOM) --
 --========================================================--
 local function BreakRoom(room)
 	if room then
@@ -140,11 +140,11 @@ local function BreakRoom(room)
 					"rbxassetid://2174790942"
 				}
 
-				-- Lần đầu tiên chạy: Kích full âm thanh phá hoại chính với âm lượng cực lớn
-				-- Lần thứ hai trở đi: Random một âm thanh bất kì trong danh sách
+				-- Lần đầu tiên chạy: Full âm thanh chính cực lớn (4.5)
+				-- Lần thứ hai trở đi: Random ngẫu nhiên một âm thanh trong danh sách
 				if totalRoomsBroken == 1 then
 					breakSound.SoundId = "rbxassetid://9114223171"
-					breakSound.Volume = 4.5 -- Full âm lượng tối đa cho lần đầu
+					breakSound.Volume = 4.5
 				else
 					breakSound.SoundId = breakSoundsList[math.random(1, #breakSoundsList)]
 					breakSound.Volume = math.random(25, 35) / 10
@@ -282,18 +282,12 @@ local entity = spawner.Create({
 	Damage = { Enabled = false, Range = 0, Amount = 0 },
 	Crucifixion = {
 		Enabled = true,
-		Range = 10,
+		Range = 50,
 		Resist = false,
 		Break = true
 	},
 	Death = {
-		Type = "Guiding",
-		Hints = {
-			"You fell victim to Multimonster.",
-			"It travels at terrifying speeds across multiple rooms.",
-			"Listen closely for its loud approach and hide immediately.",
-			"Do not let it catch you in its line of sight!"
-		},
+		Type = "Custom",
 		Cause = "multimonster"
 	}
 })
@@ -372,7 +366,7 @@ entity:SetCallback("OnStartMoving", function()
 			local character = player.Character or player.CharacterAdded:Wait()
 			local humanoid = character:FindFirstChildOfClass("Humanoid")
 			local HumanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-			local womp = Workspace:FindFirstChild("multimonster")
+			local womp = Workspace:WaitForChild("multimonster", 2)
 			
 			if not humanoid or humanoid.Health <= 0 then
 				if womp then
@@ -453,27 +447,24 @@ entity:SetCallback("OnStartMoving", function()
 							camera.CFrame = lockedCFrame * shakeCf
 						end)
 						jumpCamShake:Start()
-						jumpCamShake:ShakeOnce(25, 25, 0, 4, 90, 60)
+						jumpCamShake:ShakeOnce(10, 10, 0, 5.5, 1, 0)
 						
-						-- Cơ chế Lerp model Jumpscare áp sát camera mượt mà
-						local vector3Offset = Vector3.new(0, -1.2, -5)
-						local lerpSpeed = 0.8
 						lockCFrameConnection = RunService.RenderStepped:Connect(function()
 							if not isJumpscaring then return end
 							camera.CameraType = Enum.CameraType.Scriptable
 							if jumpscareModel then
-								local targetCF = camera.CFrame * CFrame.new(vector3Offset)
+								local targetCFrame = camera.CFrame * CFrame.new(0, -0.5, -4.5)
 								if jumpscareModel:IsA("Model") then
-									jumpscareModel:PivotTo(jumpscareModel:GetPivot():Lerp(targetCF, lerpSpeed))
+									jumpscareModel:PivotTo(targetCFrame)
 								elseif jumpscareModel:IsA("BasePart") then
-									jumpscareModel.CFrame = jumpscareModel.CFrame:Lerp(targetCF, lerpSpeed)
+									jumpscareModel.CFrame = targetCFrame
 								end
 							end
 						end)
 						
 						local scareSound = GetGitSound("https://github.com/thefigureblack/audios/blob/main/asixtyScareOmg.mp3?raw=true", "asixtyScareOmg")
 						scareSound.Parent = Workspace
-						scareSound.Volume = 6
+						scareSound.Volume = 5
 						scareSound:Play()
 						
 						task.wait(0.5)
@@ -506,80 +497,70 @@ entity:SetCallback("OnStartMoving", function()
 							end
 						end
 						
-						-- ==========================================
-						-- GIAO DIỆN JUMPSCARE 2D CHUẨN A-60 + TỰ ĐỘNG DỌN DẸP
-						-- ==========================================
 						local screenGui = Instance.new("ScreenGui")
-						screenGui.Name = "RandomImageGui"
+						screenGui.Name = "A60_JumpscareGui"
 						screenGui.Parent = player:WaitForChild("PlayerGui")
 						screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-						screenGui.IgnoreGuiInset = true
-
-						local function getRandomImageId()
-							return ALL_JUMPSCARE_IMAGES[math.random(1, #ALL_JUMPSCARE_IMAGES)]
-						end
-
-						local imageLabel = Instance.new("ImageLabel")
-						imageLabel.Size = UDim2.new(0, 0, 0, 0)
-						imageLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-						imageLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
-						imageLabel.BackgroundColor3 = Color3.new(1, 0, 0)
-						imageLabel.BackgroundTransparency = 1 
-						imageLabel.Image = "rbxassetid://" .. getRandomImageId()
-						imageLabel.ImageTransparency = 1
-						imageLabel.Parent = screenGui
-
+						
+						local randomSelectedImage = ALL_JUMPSCARE_IMAGES[math.random(1, #ALL_JUMPSCARE_IMAGES)]
+						local jumpscareImg = Instance.new("ImageLabel")
+						jumpscareImg.Name = "JumpscareImage"
+						jumpscareImg.Parent = screenGui
+						jumpscareImg.AnchorPoint = Vector2.new(0.5, 0.5)
+						jumpscareImg.Position = UDim2.new(0.5, 0, 0.5, 0)
+						jumpscareImg.Size = UDim2.new(0, 0, 0, 0)
+						jumpscareImg.BackgroundTransparency = 1
+						jumpscareImg.Image = randomSelectedImage
+						jumpscareImg.ImageTransparency = 0
+						
 						local colorCorrection = Instance.new("ColorCorrectionEffect", Lighting)
-						TweenService:Create(colorCorrection, TweenInfo.new(0.5), {
+						TweenService:Create(colorCorrection, TweenInfo.new(0.2), {
 							Brightness = 0.2,
-							Contrast = 0.2,
-							Saturation = -0.2,
+							Contrast = 0.3,
+							Saturation = -0.3,
 							TintColor = Color3.fromRGB(255, 0, 4),
 						}):Play()
 						
 						if HumanoidRootPart then HumanoidRootPart.Anchored = false end
 						
-						-- Đồng bộ DeathHint và nguyên nhân cái chết
 						pcall(function()
 							local remoteFolder = ReplicatedStorage:FindFirstChild("RemotesFolder")
 							if remoteFolder and remoteFolder:FindFirstChild("DeathHint") and firesignal then
 								firesignal(remoteFolder.DeathHint.OnClientEvent, {
-									"You fell victim to Multimonster.",
-									"It travels at terrifying speeds across multiple rooms.",
-									"Listen closely for its loud approach and hide immediately.",
-									"Do not let it catch you in its line of sight!"
-								}, "Blue", "multimonster")
+									"You fell victim to Multimonster...", "It travels at terrifying speeds across multiple rooms...", "Listen closely for its loud approach and hide immediately...", "Do not let it catch you in its line of sight!..."
+								}, "Blue", "Multimonster")
 							end
 						end)
-						
-						local statsFolder = ReplicatedStorage:FindFirstChild("GameStats")
-						if statsFolder then
-							local playerStats = statsFolder:FindFirstChild("Player_" .. player.Name)
-							if playerStats and playerStats:FindFirstChild("Total") and playerStats.Total:FindFirstChild("DeathCause") then
-								playerStats.Total.DeathCause.Value = "multimonster"
+
+						pcall(function()
+							local statsFolder = ReplicatedStorage:FindFirstChild("GameStats")
+							if statsFolder then
+								local playerStats = statsFolder:FindFirstChild("Player_" .. player.Name)
+								if playerStats and playerStats:FindFirstChild("Total") and playerStats.Total:FindFirstChild("DeathCause") then
+									playerStats.Total.DeathCause.Value = "Multimonster"
+								end
 							end
-						end
+						end)
 
-						humanoid.Health = 0
+						humanoid.Health = 0				
 						
-						-- Hiệu ứng Tween phóng to, xoay và hiện ảnh đập vào mặt
-						local GetTimeSpeed = TweenInfo.new(0.28, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
-						local Anim = TweenService:Create(imageLabel, GetTimeSpeed, {Size = UDim2.new(0, 580, 0, 580)})
-						local rot = TweenService:Create(imageLabel, GetTimeSpeed, {Rotation = 18})
-						local tran = TweenService:Create(imageLabel, GetTimeSpeed, {ImageTransparency = 0})
-
-						Anim:Play()
-						tran:Play()
-						rot:Play()
+						TweenService:Create(jumpscareImg, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+							Size = UDim2.new(1.2, 0, 1.4, 0),
+							Rotation = math.random(-25, 25)
+						}):Play()
 						
 						task.wait(0.5)
 						isJumpscaring = false
 						
-						Anim.Completed:Wait()
-						wait(0.8)
-						
-						-- Tạo hiệu ứng mờ dần rồi tự động hủy (Destroy)
-						local fadeTween = TweenService:Create(imageLabel, TweenInfo.new(0.75), {ImageTransparency = 1})
+						local function SafeCleanup()
+							pcall(function()
+								if screenGui then screenGui:Destroy() end
+								if colorCorrection then colorCorrection:Destroy() end
+								if scareSound then scareSound:Destroy() end
+							end)
+						end
+
+						local fadeTween = TweenService:Create(jumpscareImg, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { ImageTransparency = 1 })
 						fadeTween:Play()
 						
 						TweenService:Create(colorCorrection, TweenInfo.new(0.5), {
@@ -589,11 +570,10 @@ entity:SetCallback("OnStartMoving", function()
 							TintColor = Color3.fromRGB(255, 255, 255),
 						}):Play()
 						
-						fadeTween.Completed:Connect(function()
-							screenGui:Destroy()
-						end)
+						fadeTween.Completed:Connect(SafeCleanup)
+						task.delay(2.5, SafeCleanup)
 						
-						Debris:AddItem(screenGui, 6)
+						Debris:AddItem(screenGui, 4)
 						Debris:AddItem(colorCorrection, 3)
 						Debris:AddItem(scareSound, 3)
 						
