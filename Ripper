@@ -394,8 +394,8 @@ local function SpawnRipper()
 
 			Entity = {
 				Name = "Ripper Entity",
-				Asset = "rbxassetid://12272798431",
-				HeightOffset = -4.5
+				Asset = "https://github.com/PurpleHatsoOfficial/Rbxm-collection-/raw/refs/heads/main/ripper%20hardcoree%20remake%20but%20fixed%20model.rbxm",
+				HeightOffset = 0.5
 			},
 
 			Lights = {
