@@ -507,7 +507,7 @@ local function SpawnRipper()
 						"https://github.com/eoyoustme/back/raw/main/Kill_with_static.mp3",
 
 					SlamSoundId =
-						"rbxassetid://0",
+						"rbxassetid://1837829565",
 
 					EndSoundId =
 						"rbxassetid://4988621968",
