@@ -32,7 +32,7 @@ end
 
 -- Tải Frost entity từ Roblox Asset an toàn
 local success, objects = pcall(function()
-	return game:GetObjects("rbxassetid://16705676239")
+	return game:GetObjects("rbxassetid://12272255258")
 end)
 
 if not success or not objects or #objects == 0 then
