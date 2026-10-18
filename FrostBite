@@ -96,7 +96,7 @@ TweenService:Create(pointLight, TweenInfo.new(3), {Brightness = 3}):Play()
 local sound = Instance.new("Sound")
 sound.SoundId = "rbxassetid://137044859218769"
 sound.Looped = false
-sound.Volume = 0.5
+sound.Volume = 1.75
 sound.Parent = entity
 sound:Play()
 
@@ -185,7 +185,7 @@ end)
 -- Âm thanh hoạt động chính thức
 local activeSound = Instance.new("Sound")
 activeSound.Name = "Frostbite_ActiveSound"
-activeSound.SoundId = "rbxassetid://127072724991408"
+activeSound.SoundId = "127072724991408"
 activeSound.Volume = 0.8
 activeSound.Looped = true
 activeSound.Parent = entity
