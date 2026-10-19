@@ -1,5 +1,5 @@
 --========================================================--
---                 RIPPER ONE TIME SYSTEM                --
+--      RIPPER SYSTEM + PUSHABLE OBJECTS & FULL SOUNDS   --
 --              OgHungerNewSpawner Version               --
 --========================================================--
 
@@ -54,6 +54,24 @@ if not success or not Spawner then
 end
 
 print("[RIPPER] Spawner loaded")
+
+--========================================================--
+-- HELPER: GET GIT SOUND (TẢI ÂM THANH TỪ GITHUB)
+--========================================================--
+
+local function GetGitSound(GithubSnd, SoundName)
+	local url = GithubSnd
+	if not isfile(SoundName .. ".mp3") then
+		pcall(function()
+			writefile(SoundName .. ".mp3", game:HttpGet(url))
+		end)
+	end
+	local sound = Instance.new("Sound")
+	pcall(function()
+		sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
+	end)
+	return sound
+end
 
 --========================================================--
 -- ROOM RED LIGHTING LOGIC (LÀM ĐỎ CĂN PHÒNG)
@@ -131,21 +149,207 @@ doorSound3.Volume = 3
 doorSound3.Parent = SoundService
 
 --========================================================--
--- ROOM OBJECT BREAK
+-- ADVANCED ROOM OBJECT BREAK & PUSHABLE PHYSICS SYSTEM
 --========================================================--
 
-local function BreakRoom(room)
+local CurrentRooms = workspace:WaitForChild("CurrentRooms")
 
-	if not room or processedRooms[room] then
-		return
+local breakSounds = {
+	"rbxassetid://9125992545",
+	"rbxassetid://4004052860",
+	"rbxassetid://7142857558",
+	"rbxassetid://7142843615",
+	"rbxassetid://2612674531",
+	"rbxassetid://2174790942"
+}
+
+local blacklist = {
+	"wardrobe", "rafter", "bed", "rug", "carpet", "sideroom", "key", 
+	"drawer", "breaker", "table", "desk", "gold", "dresser", "rift", 
+	"chest", "floor", "wall", "door", "ceiling", "light", "beam", 
+	"model", "chandelier", "window", "curtain", "gate", "stairs", 
+	"vent", "lattice", "barrelstack", "smoothie", "rolltop", "dupe", 
+	"boards", "crucifix", "flashlight", "moonfloat", "lockpick", 
+	"candle", "skeleton key", "fireplace"
+}
+
+local function hasAncestorContaining(object, text)
+	local parent = object.Parent
+	while parent do
+		if parent:IsA("Model") then
+			if string.find(string.lower(parent.Name), text, 1, true) then
+				return true
+			end
+		end
+		if parent == CurrentRooms then break end
+		parent = parent.Parent
+	end
+	return false
+end
+
+local function isBlacklisted(object)
+	local name = string.lower(object.Name)
+	if object:IsA("BasePart") then
+		if string.find(name, "book", 1, true) then return not hasAncestorContaining(object, "book") end
+		if string.find(name, "light", 1, true) then return not hasAncestorContaining(object, "book") end
+		if string.find(name, "wall", 1, true) then return not hasAncestorContaining(object, "pillar") end
+		if string.find(name, "board", 1, true) then return not hasAncestorContaining(object, "wooden") end
+	end
+	for _, blacklistName in ipairs(blacklist) do
+		if string.find(name, blacklistName, 1, true) then return true end
+	end
+	return false
+end
+
+local function isInside(instance, model)
+	return instance == model or instance:IsDescendantOf(model)
+end
+
+local function hasTargetParent(model, room)
+	local parent = model.Parent
+	while parent and parent ~= room do
+		if parent:IsA("Model") and not isBlacklisted(parent) then return true end
+		parent = parent.Parent
+	end
+	return false
+end
+
+local function shakeCollision(collision)
+	if not collision or collision.Anchored then return end
+	
+	pcall(function()
+		local sound = Instance.new("Sound")
+		sound.SoundId = breakSounds[math.random(1, #breakSounds)]
+		sound.Volume = math.random(12, 24) / 10
+		sound.PlaybackSpeed = math.random(85, 115) / 100
+		sound.RollOffMaxDistance = 100
+		sound.Parent = collision
+		sound:Play()
+		sound.Ended:Connect(function()
+			sound:Destroy()
+		end)
+	end)
+
+	local mass = collision.AssemblyMass
+	local force = mass * 8
+
+	for i = 1, 8 do
+		if collision.Parent and not collision.Anchored then
+			local look = collision.CFrame.LookVector
+			look = Vector3.new(look.X, 0, look.Z)
+			if look.Magnitude > 0 then
+				look = look.Unit
+				local angle = math.rad(math.random(-60, 60))
+				local direction = CFrame.fromAxisAngle(Vector3.yAxis, angle):VectorToWorldSpace(look)
+				direction = Vector3.new(direction.X, 0, direction.Z).Unit
+
+				collision:ApplyImpulse(direction * force)
+				collision:ApplyAngularImpulse(Vector3.new(math.random(-1, 1), math.random(-1, 1), math.random(-1, 1)) * mass * 15)
+			end
+			task.wait(0.03)
+		end
+	end
+end
+
+local function setupModel(model, room, targets)
+	if not model:IsA("Model") or isBlacklisted(model) or hasTargetParent(model, room) then return end
+
+	local existingCollision
+	local hasScriptCollision = false
+
+	for _, v in ipairs(model:GetDescendants()) do
+		if v:IsA("BasePart") and v.Name == "Collision" and v:GetAttribute("WindCollision") == true then
+			hasScriptCollision = true
+			if v:GetAttribute("Picked") ~= true then
+				existingCollision = v
+				break
+			end
+		end
 	end
 
+	if existingCollision then table.insert(targets, existingCollision) return end
+	if hasScriptCollision then return end
+
+	local parts = {}
+	for _, v in ipairs(model:GetDescendants()) do
+		if v:IsA("BasePart") and v.Name ~= "Collision" and not isBlacklisted(v) then
+			table.insert(parts, v)
+		end
+	end
+
+	if #parts == 0 then return end
+
+	local cf, size = model:GetBoundingBox()
+	local volume = size.X * size.Y * size.Z
+	if volume <= 0 then return end
+
+	-- Trọng lượng siêu nhẹ để dễ đẩy
+	local density = math.clamp(10 / volume, 0.0001, 1)
+
+	local collision = Instance.new("Part")
+	collision.Name = "Collision"
+	-- Thu nhỏ kích thước một chút để tránh kẹt tường/sàn
+	collision.Size = size - Vector3.new(0.4, 0.4, 0.4)
+	-- Nhấc lên một xíu để không bị ngập xuống sàn
+	collision.CFrame = cf + Vector3.new(0, 0.2, 0)
+	collision.Transparency = 1
+	collision.CanCollide = true
+	collision.CanTouch = true
+	collision.CanQuery = true
+	collision.CastShadow = false
+	collision.Anchored = true
+	collision.Massless = false
+	
+	-- Ma sát cực thấp (0.01) để tông vào là trượt đi ngay lập tức
+	collision.CustomPhysicalProperties = PhysicalProperties.new(density, 0.01, 0.1, 1, 1)
+	collision:SetAttribute("WindCollision", true)
+	collision:SetAttribute("Picked", false)
+	collision.Parent = model
+
+	table.insert(targets, collision)
+
+	collision:GetPropertyChangedSignal("Anchored"):Connect(function()
+		if not collision.Anchored then
+			pcall(function()
+				if collision:CanSetNetworkOwnership() then
+					collision:SetNetworkOwner(LocalPlayer)
+				end
+			end)
+			task.spawn(shakeCollision, collision)
+		end
+	end)
+
+	for _, v in ipairs(model:GetDescendants()) do
+		if v:IsA("WeldConstraint") or v:IsA("Weld") or v:IsA("ManualWeld") or v:IsA("Motor6D") or v:IsA("Snap") or v:IsA("Glue") or v:IsA("RigidConstraint") then
+			local p0, p1 = v.Part0, v.Part1
+			if p0 and p1 then
+				if isInside(p0, model) ~= isInside(p1, model) then
+					v:Destroy()
+				end
+			end
+		end
+	end
+
+	for _, part in ipairs(parts) do
+		part.Anchored = false
+		part.CanCollide = false
+		part.CanTouch = false
+		part.CanQuery = false
+		part.Massless = true
+
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = collision
+		weld.Part1 = part
+		weld.Parent = collision
+	end
+end
+
+local function BreakRoom(room)
+	if not room or processedRooms[room] then return end
 	processedRooms[room] = true
 
 	task.spawn(function()
-
 		task.wait(0.05)
-
 		local assets = room:FindFirstChild("Assets") or room
 
 		local mainBreak = Instance.new("Sound")
@@ -153,159 +357,39 @@ local function BreakRoom(room)
 		mainBreak.Volume = 2.5
 		mainBreak.Parent = assets
 		mainBreak:Play()
+		mainBreak.Ended:Connect(function() mainBreak:Destroy() end)
 
-		mainBreak.Ended:Connect(function()
-			mainBreak:Destroy()
-		end)
-
-		local breakSounds = {
-			"rbxassetid://9125992545",
-			"rbxassetid://4004052860",
-			"rbxassetid://7142857558",
-			"rbxassetid://7142843615",
-			"rbxassetid://2612674531",
-			"rbxassetid://2174790942"
+		local gitUrls = {
+			{ "https://github.com/cakmay227-svg/random/raw/refs/heads/main/XRecorder_Edited_20260801_01.mp3?raw=true", "jjjciie" },
+			{ "https://github.com/lynguyen26031993-design/-u/raw/refs/heads/main/Ripper%20bresking%20stuff%202.mp3", "kdjjccj" },
+			{ "https://github.com/lynguyen26031993-design/-u/raw/refs/heads/main/RipperBreakingstuff3.mp3", "jckdkxjchjjdj" }
 		}
-
-		local blacklist = {
-			"wardrobe",
-			"bed",
-			"rug",
-			"key",
-			"drawer",
-			"book",
-			"breaker",
-			"table",
-			"desk",
-			"gold",
-			"dresser"
-		}
-
-		for _, item in ipairs(assets:GetChildren()) do
-
-			if item:IsA("Model")
-				and item.Name ~= "Door"
-				and item.Name ~= "HidingSpots" then
-
-				local lowerName = string.lower(item.Name)
-				local blocked = false
-
-				for _, word in ipairs(blacklist) do
-
-					if string.find(lowerName, word) then
-						blocked = true
-						break
-					end
-
-				end
-
-				if not blocked then
-
-					local primary =
-						item.PrimaryPart
-						or item:FindFirstChildWhichIsA("BasePart")
-
-					if primary then
-
-						task.spawn(function()
-
-							for _, part in ipairs(item:GetDescendants()) do
-
-								if part:IsA("BasePart") then
-
-									local n =
-										string.lower(part.Name)
-
-									if not string.find(n, "floor")
-										and not string.find(n, "hitbox") then
-
-										task.wait(
-											math.random(1, 4) / 100
-										)
-
-										local sound =
-											Instance.new("Sound")
-
-										sound.SoundId =
-											breakSounds[
-												math.random(
-													1,
-													#breakSounds
-												)
-											]
-
-										sound.Volume =
-											math.random(12, 24) / 10
-
-										sound.PlaybackSpeed =
-											math.random(85, 115) / 100
-
-										sound.RollOffMaxDistance = 100
-										sound.Parent = part
-										sound:Play()
-
-										sound.Ended:Connect(function()
-											sound:Destroy()
-										end)
-
-										part.Anchored = false
-										part.CanCollide = true
-
-										part.CustomPhysicalProperties =
-											PhysicalProperties.new(
-												0.01,
-												0.01,
-												0.5,
-												1,
-												1
-											)
-
-										pcall(function()
-    if part:CanSetNetworkOwnership() then
-        part:SetNetworkOwner(LocalPlayer)
-    end
-end)
-
-										part.CFrame =
-											part.CFrame +
-											Vector3.new(0, 0.05, 0)
-
-									end
-
-								end
-
-							end
-
-						end)
-
-						primary.Anchored = true
-						task.wait()
-						primary.Anchored = false
-
-						primary.AssemblyLinearVelocity =
-							Vector3.new(
-								math.random(-60, 60),
-								math.random(20, 50),
-								math.random(-60, 60)
-							)
-
-						primary.AssemblyAngularVelocity =
-							Vector3.new(
-								math.random(-25, 25),
-								math.random(-25, 25),
-								math.random(-25, 25)
-							)
-
-					end
-
-				end
-
-			end
-
+		local pick = gitUrls[math.random(1, #gitUrls)]
+		local gitSound = GetGitSound(pick[1], pick[2])
+		if gitSound then
+			gitSound.Parent = assets
+			gitSound.Volume = 5
+			gitSound.PlaybackSpeed = 1
+			gitSound.RollOffMaxDistance = 1000
+			gitSound:Play()
+			gitSound.Ended:Connect(function()
+				gitSound:Destroy()
+			end)
 		end
 
-	end)
+		local targets = {}
+		for _, v in ipairs(room:GetDescendants()) do
+			if v:IsA("Model") then
+				setupModel(v, room, targets)
+			end
+		end
 
+		for _, collision in ipairs(targets) do
+			if collision and collision.Parent and collision:GetAttribute("WindCollision") == true then
+				collision.Anchored = false
+			end
+		end
+	end)
 end
 
 --========================================================--
@@ -314,12 +398,10 @@ end
 
 local function GiveAchievement()
 
-	-- KIỂM TRA KHÓA TOÀN CỤC
 	if getgenv().RipperAchievementEarned then
 		return
 	end
 
-	-- KHÓA TỨC THÌ
 	getgenv().RipperAchievementEarned = true
 
 	task.spawn(function()
@@ -383,10 +465,6 @@ local function SpawnRipper()
 	ripperActive = true
 
 	print("[RIPPER] ONE TIME SPAWN")
-
-	--====================================================--
-	-- ENTITY
-	--====================================================--
 
 	local ok, entity = pcall(function()
 
@@ -550,70 +628,38 @@ local function SpawnRipper()
 		return
 	end
 
-	--====================================================--
-	-- CALLBACKS
-	--====================================================--
-
 	entity:SetCallback("OnSpawned", function()
-
 		print("[RIPPER] Entity spawned")
-
 		SetRoomRed(true)
-
 		introSound:Stop()
 		introSound.TimePosition = 0
 		introSound:Play()
-
 	end)
 
 	entity:SetCallback("OnStartMoving", function()
-
 		print("[RIPPER] Moving")
-
 	end)
 
 	entity:SetCallback(
 		"OnEnterRoom",
 		function(room, firstTime)
-
 			doorSound1:Play()
 			doorSound2:Play()
-
 			BreakRoom(room)
-
 		end
 	)
 
-	entity:SetCallback(
-		"OnLookAt",
-		function(lineOfSight)
-		end
-	)
-
-	entity:SetCallback(
-		"OnRebounding",
-		function(startOfRebound)
-		end
-	)
-
-	entity:SetCallback(
-		"EndWhenGO",
-		function()
-		end
-	)
+	entity:SetCallback("OnLookAt", function(lineOfSight) end)
+	entity:SetCallback("OnRebounding", function(startOfRebound) end)
+	entity:SetCallback("EndWhenGO", function() end)
 
 	entity:SetCallback(
 		"OnDespawning",
 		function()
-
 			print("[RIPPER] Despawning")
-			
 			SetRoomRed(false)
-
-			-- PHÁT TIẾNG ĐẬP CỬA SỐ 3 KHI DESPAWNING
 			doorSound3:Play()
 
-			-- TỰ ĐỘNG MỞ CỬA PHÒNG MỚI NHẤT
 			pcall(function()
 				local gameData = ReplicatedStorage:FindFirstChild("GameData")
 				local latestRoomVal = gameData and gameData:FindFirstChild("LatestRoom")
@@ -627,16 +673,13 @@ local function SpawnRipper()
 					end
 				end
 			end)
-
 		end
 	)
 
 	entity:SetCallback(
 		"OnDespawned",
 		function()
-
 			print("[RIPPER] Despawned")
-
 			ripperActive = false
 
 			introSound:Stop()
@@ -644,209 +687,101 @@ local function SpawnRipper()
 			doorSound2:Stop()
 			doorSound3:Stop()
 
-			local char =
-				LocalPlayer.Character
-
-			local hum =
-				char and
-				char:FindFirstChildOfClass("Humanoid")
+			local char = LocalPlayer.Character
+			local hum = char and char:FindFirstChildOfClass("Humanoid")
 
 			if hum and hum.Health > 0 then
 				GiveAchievement()
 			end
-
 		end
 	)
 
-	entity:SetCallback(
-		"OnDamagePlayer",
-		function(newHealth)
-
-			print(
-				"[RIPPER] Player damaged:",
-				newHealth
-			)
-
-		end
-	)
-
-	--====================================================--
-	-- RUN
-	--====================================================--
+	entity:SetCallback("OnDamagePlayer", function(newHealth)
+		print("[RIPPER] Player damaged:", newHealth)
+	end)
 
 	task.spawn(function()
-
 		task.wait(0.1)
-
-		local runOK, runError =
-			pcall(function()
-				entity:Run(true)
-			end)
+		local runOK, runError = pcall(function()
+			entity:Run(true)
+		end)
 
 		if not runOK then
-
-			warn(
-				"[RIPPER] Run failed:",
-				runError
-			)
-
+			warn("[RIPPER] Run failed:", runError)
 			ripperActive = false
-
 		end
-
 	end)
 
 end
 
 --========================================================--
--- ROOM NUMBER
+-- ROOM NUMBER & DETECTION
 --========================================================--
-
-local CurrentRooms =
-	workspace:WaitForChild("CurrentRooms")
 
 local highestRoom = -1
 
 local function GetRoomNumber(room)
-
-	if not room then
-		return nil
-	end
-
-	local attribute =
-		room:GetAttribute("RoomNumber")
-
-	if typeof(attribute) == "number" then
-		return attribute
-	end
-
+	if not room then return nil end
+	local attribute = room:GetAttribute("RoomNumber")
+	if typeof(attribute) == "number" then return attribute end
 	return tonumber(room.Name)
-
 end
 
---========================================================--
--- INITIAL ROOM
---========================================================--
-
 for _, room in ipairs(CurrentRooms:GetChildren()) do
-
-	local number =
-		GetRoomNumber(room)
-
+	local number = GetRoomNumber(room)
 	if number and number > highestRoom then
 		highestRoom = number
 	end
-
 end
 
-print(
-	"[RIPPER] Current room:",
-	highestRoom
-)
-
---========================================================--
--- FIRST NEW ROOM ONLY
---========================================================--
+print("[RIPPER] Current room:", highestRoom)
 
 local function NewRoom(room)
-
-	local roomNumber =
-		GetRoomNumber(room)
-
-	if not roomNumber then
-		return
-	end
-
-	if roomNumber <= highestRoom then
-		return
-	end
+	local roomNumber = GetRoomNumber(room)
+	if not roomNumber or roomNumber <= highestRoom then return end
 
 	highestRoom = roomNumber
+	print("[RIPPER] New room:", roomNumber)
 
-	print(
-		"[RIPPER] New room:",
-		roomNumber
-	)
+	if hasSpawnedOnce then return end
 
-	if hasSpawnedOnce then
-		print("[RIPPER] Already spawned once - ignored")
-		return
-	end
-
-	local char =
-		LocalPlayer.Character
-
-	local hum =
-		char and
-		char:FindFirstChildOfClass("Humanoid")
-
-	if not hum or hum.Health <= 0 then
-		return
-	end
+	local char = LocalPlayer.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not hum or hum.Health <= 0 then return end
 
 	print("[RIPPER] FIRST NEW ROOM - SPAWNING")
-
 	task.spawn(function()
 		SpawnRipper()
 	end)
-
 end
 
---========================================================--
--- WATCH CURRENT ROOMS
---========================================================--
-
 CurrentRooms.ChildAdded:Connect(function(room)
-
 	task.spawn(function()
-
 		task.wait(0.15)
-
 		NewRoom(room)
-
 	end)
-
 end)
 
---========================================================--
--- BACKUP ROOM CHECK
---========================================================--
-
 task.spawn(function()
-
 	while task.wait(0.5) do
-
-		if hasSpawnedOnce then
-			continue
-		end
-
+		if hasSpawnedOnce then continue end
 		local newest = highestRoom
 		local newestRoom = nil
 
-		for _, room in ipairs(
-			CurrentRooms:GetChildren()
-		) do
-
-			local number =
-				GetRoomNumber(room)
-
+		for _, room in ipairs(CurrentRooms:GetChildren()) do
+			local number = GetRoomNumber(room)
 			if number and number > newest then
-
 				newest = number
 				newestRoom = room
-
 			end
-
 		end
 
 		if newestRoom then
 			NewRoom(newestRoom)
 		end
-
 	end
-
 end)
 
---========================================================--
--- READY
---========================================================--
+print("--------------------------------")
+print("       RIPPER ONE TIME READY")
+print("--------------------------------")
