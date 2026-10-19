@@ -1,0 +1,745 @@
+-- ========================================================
+--          HARDCORE SCRIPT + ITEM SYSTEM + A-90 + STATS
+-- ========================================================
+
+-- ====== CHỐNG CHẠY SCRIPT HAI LẦN TRỜ LÊN ======
+if _G.HardcoreScriptExecuted == true then
+	pcall(function()
+		local mainGame = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui", 5):WaitForChild("MainUI", 5):WaitForChild("Initiator", 5):WaitForChild("Main_Game", 5)
+		if mainGame then
+			require(mainGame).caption("Script đã được kích hoạt trước đó!", true)
+		end
+	end)
+	warn("[Hardcore System] Phát hiện cố gắng chạy lại Script! Đã hủy lệnh.")
+	return
+end
+
+local HardcoreInit = game.Workspace:FindFirstChild("HardcoreInit")
+if HardcoreInit and HardcoreInit.Value == true then
+	_G.HardcoreScriptExecuted = true
+	return
+end
+
+_G.HardcoreScriptExecuted = true
+
+if not HardcoreInit then
+	HardcoreInit = Instance.new("BoolValue")
+	HardcoreInit.Name = "HardcoreInit" 
+	HardcoreInit.Value = true
+	HardcoreInit.Parent = game.Workspace
+else
+	HardcoreInit.Value = true
+end
+
+-- ====== KIỂM TRA MÔI TRƯỜNG NGHIÊM NGẶT: CHỈ CHẠY KHI ĐÃ VÀO VÁN CHƠI DOORS (KHÔNG CHẠY Ở SẢNH) ======
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local function IsInDoorsGameLevel()
+	local gameData = ReplicatedStorage:FindFirstChild("GameData")
+	local currentRooms = Workspace:FindFirstChild("CurrentRooms")
+	
+	if not gameData or not currentRooms then
+		return false
+	end
+	
+	local latestRoom = gameData:FindFirstChild("LatestRoom")
+	if not latestRoom then
+		return false
+	end
+	
+	if #currentRooms:GetChildren() == 0 and latestRoom.Value == 0 then
+		return false
+	end
+	
+	return true
+end
+
+if not IsInDoorsGameLevel() then
+	warn("[Hardcore System] Cảnh báo: Script chỉ hoạt động khi đã vào ván chơi DOORS (không chạy ở sảnh chờ)! Đang tự hủy...")
+	pcall(function()
+		local hint = Instance.new("Hint")
+		hint.Parent = Workspace
+		hint.Text = "❌ LỖI: Màn chơi không hợp lệ! Đang tự hủy..."
+		task.wait(3)
+		hint:Destroy()
+	end)
+	if HardcoreInit then
+		HardcoreInit:Destroy()
+	end
+	_G.HardcoreScriptExecuted = nil
+	return
+end
+
+-- ====== 1. KIỂM TRA PHÒNG BAN ĐẦU (KICK NẾU TỪ CỬA 2 TRỜ LÊN) ======
+task.spawn(function()
+	local p = ReplicatedStorage:WaitForChild("GameData"):WaitForChild("LatestRoom").Value
+	if p >= 1 then
+		game.Players.LocalPlayer:Kick("Execute the script at door 1")
+	end
+end)
+
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Debris = game:GetService("Debris")
+
+local LocalPlayer = Players.LocalPlayer
+_G.AssetsLoaded = false 
+
+-- ====== HỆ THỐNG THỐNG KÊ SINH TỒN & THỰC THỂ ======
+local SessionStartTime = os.clock()
+_G.EncounteredEntitiesCount = 0
+
+local function RecordEntityEncounter(entityName)
+	_G.EncounteredEntitiesCount = (_G.EncounteredEntitiesCount or 0) + 1
+end
+
+local function SetupDeathListener(char)
+	local humanoid = char:WaitForChild("Humanoid", 10)
+	if humanoid then
+		humanoid.Died:Once(function()
+			local survivalTime = math.floor(os.clock() - SessionStartTime)
+			local minutes = math.floor(survivalTime / 60)
+			local seconds = survivalTime % 60
+			local timeFormatted = string.format("%d phút %d giây", minutes, seconds)
+			local totalRooms = 1
+			pcall(function()
+				totalRooms = ReplicatedStorage.GameData.LatestRoom.Value
+			end)
+			
+			task.wait(2.5)
+			pcall(function()
+				local mainGame = LocalPlayer:WaitForChild("PlayerGui", 5):WaitForChild("MainUI", 5):WaitForChild("Initiator", 5):WaitForChild("Main_Game", 5)
+				if mainGame then
+					require(mainGame).caption("--- KẾT QUẢ SINH TỒN ---", true)
+					task.wait(3.5)
+					require(mainGame).caption(string.format("Survival Time: %s (Đến cửa %d)", timeFormatted, totalRooms), true)
+					task.wait(3.5)
+					require(mainGame).caption(string.format("Entity Encounter: %d", _G.EncounteredEntitiesCount), true)
+				end
+			end)
+		end)
+	end
+end
+
+-- Tự động kích hoạt lắng nghe sự kiện chết của nhân vật
+LocalPlayer.CharacterAdded:Connect(SetupDeathListener)
+if LocalPlayer.Character then
+	SetupDeathListener(LocalPlayer.Character)
+end
+
+-- ====== HÀM THÔNG BÁO AN TOÀN ======
+local function Notify(text, bool)
+	pcall(function()
+		local mainGame = LocalPlayer:WaitForChild("PlayerGui", 5):WaitForChild("MainUI", 5):WaitForChild("Initiator", 5):WaitForChild("Main_Game", 5)
+		if mainGame then
+			require(mainGame).caption(text, bool or true)
+		end
+	end)
+end
+
+Notify("Execute Success", true)
+
+-- ====== BIẾN TOÀN CỤC THEO DÕI BOSS / QUÁI & FIX NODE SEEK ======
+_G.SeekActive = false
+_G.FigureActive = false
+_G.BossActive = false
+_G.GlobalCooldown = false
+
+local LastSeekState = false
+local SeekCooldownTimer = 0
+
+_G.ActiveEntities = {
+	["Rebound"]   = false,
+	["Cease"]     = false,
+	["Frostbite"] = false,
+	["Silence"]   = false,
+	["A-60"]      = false,
+	["Ripper"]    = false,
+	["Shocker"]   = false,
+	["DeerGod"]   = false,
+	["Dread"]     = false
+}
+
+local CachedEntityScripts = {}
+local latestRoom = ReplicatedStorage:WaitForChild("GameData"):WaitForChild("LatestRoom")
+local roomConnection = nil
+
+-- ====== HỆ THỐNG PHÁT HIỆN MỞ CỬA SỚM -> KILL ======
+local function startChecking()
+	if roomConnection then return end 
+
+	roomConnection = latestRoom.Changed:Connect(function(value)
+		if value > 0 and not _G.AssetsLoaded then
+			local character = LocalPlayer.Character
+			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				humanoid.Health = 0
+			end
+		end
+	end)
+end
+
+local function cancelChecking()
+	if roomConnection then
+		roomConnection:Disconnect()
+		roomConnection = nil 
+	end
+end
+
+startChecking() 
+
+-- ====== BẢNG DỮ LIỆU ASSETS ======
+local VisualScripts = {
+	"https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/Rush",
+	"https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/Ambush",
+	"https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/Seek",
+	"https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/Light-Hardcore",
+	"https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/Guiding-Sound"
+}
+
+local EntityScripts = {
+	["Rebound"]   = "https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/Rebound",
+	["Cease"]     = "https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/Cease", 
+	["Frostbite"] = "https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/FrostBite",
+	["Silence"]   = "https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/Silence",
+	["A-60"]      = "https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/Multimonster",
+	["Ripper"]    = "https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/Ripper",
+	["Shocker"]   = "https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/Shocker",
+	["DeerGod"]   = "https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/DeerGod",
+	["Dread"]     = "https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/Dread"
+}
+
+-- ====== THANH LOADING ASSETS FULL ======
+local hint = Instance.new("Hint")
+hint.Parent = Workspace
+
+local totalAssets = 3 + #VisualScripts + 9 
+local loadedAssets = 0
+local startTime = os.clock()
+
+local function SelfDestruct(reason)
+	cancelChecking()
+	_G.HardcoreScriptExecuted = nil
+	_G.AssetsLoaded = nil
+	
+	local initObj = Workspace:FindFirstChild("HardcoreInit")
+	if initObj then
+		initObj:Destroy()
+	end
+	
+	hint.Text = "❌ TẢI ASSET THẤT BẠI: " .. reason .. " | Đã hủy Script, vui lòng Execute lại!"
+	Notify("Load Asset Failed! Resetting...", true)
+	task.wait(3)
+	if hint then hint:Destroy() end
+end
+
+local function UpdateProgress(name)
+	loadedAssets = loadedAssets + 1
+	local elapsedTime = string.format("%.2f", os.clock() - startTime)
+	hint.Text = string.format("Loading FULL Assets [%d/%d] - %s (%ss)", loadedAssets, totalAssets, name, elapsedTime)
+end
+
+hint.Text = "Đang khởi tạo nạp FULL tài nguyên..."
+
+-- 1. Load Figure Script
+local s1 = pcall(function()
+	local figureUrl = "https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/Figure"
+	local successHttp, content = pcall(function()
+		return game:HttpGet(figureUrl)
+	end)
+	
+	if successHttp and content and #content > 0 then
+		local loadedFunc, err = loadstring(content)
+		if loadedFunc then
+			loadedFunc()
+		else
+			error("Syntax error in Figure script: " .. tostring(err))
+		end
+	else
+		error("Không thể tải nội dung Figure script qua HttpGet")
+	end
+end)
+if not s1 then SelfDestruct("Figure Script Error") return end
+UpdateProgress("Figure Script")
+
+-- 2. Load Visual Scripts & Guiding Light Music (Riêng Light-Hardcore lỗi sẽ tự bỏ qua an toàn)
+local visualFailed = false
+for i, url in ipairs(VisualScripts) do
+	local sv, err = pcall(function()
+		loadstring(game:HttpGet(url))()
+	end)
+	if not sv then
+		if string.find(url, "Light-Hardcore") then
+			warn("[Hardcore System] Light-Hardcore script lỗi/không phản hồi, đã bỏ qua an toàn:", err)
+		else
+			visualFailed = true
+			break
+		end
+	end
+	UpdateProgress("Visual/Audio Script #" .. i)
+end
+if visualFailed then SelfDestruct("Visual & Audio Scripts Error") return end
+
+-- 3. Tải trước (Cache FULL) toàn bộ Script Quái Custom
+local entityFailed = false
+local failedEntityName = ""
+for name, url in pairs(EntityScripts) do
+	local se = pcall(function()
+		local code = game:HttpGet(url)
+		if code and #code > 0 then
+			CachedEntityScripts[name] = code
+		else
+			error("Empty code")
+		end
+	end)
+	if not se then
+		entityFailed = true
+		failedEntityName = name
+		break
+	end
+	UpdateProgress("Entity Code: " .. name)
+end
+if entityFailed then SelfDestruct("Entity " .. failedEntityName .. " Error") return end
+
+-- 4. HỆ THỐNG PHÁT VẬT PHẨM NGẪU NHIÊN (CANDLE & SIÊU HIẾM)
+local s4 = pcall(function()
+	task.spawn(function()
+		local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		task.wait(1.5)
+		
+		if math.random(1, 100) <= 30 then
+			local Candles = {
+				"https://raw.githubusercontent.com/kodbolx/kodbolhub/refs/heads/main/guidingcandle.lua",
+				"https://raw.githubusercontent.com/kodbolx/kodbolhub/refs/heads/main/curiouscandle.lua",
+				"https://raw.githubusercontent.com/kodbolx/kodbolhub/refs/heads/main/mischievouscandle.lua"
+			}
+			local chosenUrl = Candles[math.random(1, #Candles)]
+			pcall(function()
+				loadstring(game:HttpGet(chosenUrl))()
+			end)
+			return
+		end
+		
+		local ultraRareChance = math.random(1, 4000)
+		if ultraRareChance <= 10 then 
+			local ultraRareItems = {
+				"https://raw.githubusercontent.com/Not-Guestly/Scripts/refs/heads/main/Viridislight-Bottle",
+				"https://raw.githubusercontent.com/thelostw3r/Scripts/refs/heads/main/PurpleFlashlight.lua",
+				"https://gist.githubusercontent.com/IdkMyNameLoll/04d7dd5e02688624b958b8c2604b924c/raw/9e86b34249f44ed2dd433176e67daaf3db30cde8/MoonBottle",
+				"https://raw.githubusercontent.com/binhlforsaken156-sys/Guiding-flash-light/refs/heads/main/Guiding-flash-light.lua",
+				"https://raw.githubusercontent.com/aadyian9000/the-thing/main/GoldenGummyFlashlight.lua",
+				"https://gist.githubusercontent.com/IdkMyNameLoll/8b05c837bea9effac2554340465b4be1/raw/3f3be0ee72e7f153db39a16a40fa63dce6cde72d/SpiralBottle",
+				"https://raw.githubusercontent.com/Not-Guestly/Scripts/refs/heads/main/Viridislight-Jug"
+			}
+			local chosenRareUrl = ultraRareItems[math.random(1, #ultraRareItems)]
+			pcall(function()
+				loadstring(game:HttpGet(chosenRareUrl))()
+			end)
+		end
+	end)
+end)
+if not s4 then SelfDestruct("Item Support Script Error") return end
+UpdateProgress("Item Support System")
+
+-- 5. Load Sprint / Stamina System
+local srit = pcall(function()     
+	_G.mobile_sprint_config = {
+		usewhileloading = true,      
+		maxstamina = 150,            
+		staminadrain = 20,           
+		staminaregen = 15,           
+		regendelay = 1.5,            
+		sprintboost = 5,             
+		overlaydarkness = 0.4,       
+		soundvolume = 3,             
+	}
+
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/Stamina"))()
+end)
+if not srit then SelfDestruct("Sprint Script Error") return end
+UpdateProgress("Sprint System")
+
+_G.AssetsLoaded = true
+local totalTime = string.format("%.2f", os.clock() - startTime)
+hint.Text = string.format("ĐÃ LOAD FULL 100%% TÀI NGUYÊN! (%s giây) - Bắt đầu chơi!", totalTime)
+task.wait(1.5)
+hint:Destroy()
+
+-- Cấu hình Seed
+local gameData = ReplicatedStorage:FindFirstChild("GameData")
+local seed = 12345
+if gameData then
+	local seedVal = gameData:FindFirstChild("GameSeed")
+	if seedVal and seedVal:IsA("ValueBase") then
+		seed = seedVal.Value
+	elseif gameData:GetAttribute("GameSeed") then
+		seed = gameData:GetAttribute("GameSeed")
+	end
+end
+
+task.wait(0.5)
+Notify("Script Made By Rebound", true)
+task.wait(1.5)
+Notify("Fixed By DatIdiot", true)
+
+-- ====== HÀM KIỂM TRA PHÒNG MID ======
+local function IsMidGame()
+	local val = latestRoom.Value
+	return val >= 35 and val < 50
+end
+
+-- ====== HỆ THỐNG KIỂM TRA SEEK & FIGURE ======
+local function CheckBossStatus()
+	local currentRoomVal = latestRoom.Value
+	
+	local seekPresent = Workspace:FindFirstChild("SeekMoving") or 
+	                    Workspace:FindFirstChild("SeekMovingNew") or 
+	                    Workspace:FindFirstChild("SeekMovingNewClone") or 
+	                    Workspace:FindFirstChild("Seek") ~= nil
+
+	local figurePresent = Workspace:FindFirstChild("Figure") ~= nil or 
+	                      Workspace:FindFirstChild("FigureRig") ~= nil or 
+	                      Workspace:FindFirstChild("FigureSetup") ~= nil or
+	                      currentRoomVal == 50 or currentRoomVal == 100
+
+	local currentRooms = Workspace:FindFirstChild("CurrentRooms")
+	if currentRooms then
+		local room = currentRooms:FindFirstChild(tostring(currentRoomVal))
+		if room then
+			local roomName = room.Name:lower()
+			if room:FindFirstChild("SeekFolder") or room:FindFirstChild("SeekTrigger") or room:GetAttribute("Seek") or roomName:find("seek") then
+				seekPresent = true
+			end
+			if room:FindFirstChild("Figure") or roomName:find("figure") then
+				figurePresent = true
+			end
+		end
+	end
+
+	if LastSeekState and not seekPresent then
+		SeekCooldownTimer = tick() + 12 
+	end
+	LastSeekState = seekPresent
+
+	_G.SeekActive = seekPresent
+	_G.FigureActive = figurePresent
+	_G.BossActive = (seekPresent or figurePresent)
+
+	return _G.BossActive
+end
+
+task.spawn(function()
+	while task.wait(0.3) do
+		CheckBossStatus()
+	end
+end)
+
+-- ====== HỆ THỐNG TỰ ĐỘNG QUÉT & TIÊU DIỆT THỰC THỂ KHI CÓ BOSS ======
+local function CleanUpCustomEntities()
+	local entityNames = {"Rebound", "Cease", "Frostbite", "Silence", "multimonster", "A60", "Ripper", "Shocker", "DeerGod", "Dread"}
+	for _, name in ipairs(entityNames) do
+		local foundObj = Workspace:FindFirstChild(name)
+		if foundObj then
+			pcall(function()
+				foundObj:Destroy()
+			end)
+		end
+	end
+	for key, _ in pairs(_G.ActiveEntities) do
+		_G.ActiveEntities[key] = false
+	end
+end
+
+task.spawn(function()
+	while task.wait(0.2) do
+		if _G.SeekActive or _G.FigureActive or latestRoom.Value == 50 or latestRoom.Value == 100 then
+			CleanUpCustomEntities()
+		end
+	end
+end)
+
+-- ====== HỆ THỐNG KIỂM TRA VÀ XUẤT HIỆN THÁNH GIÁ TRONG PHÒNG MỚI ======
+local function HasCrucifixInInventory()
+	local char = LocalPlayer.Character
+	if char then
+		for _, v in ipairs(char:GetChildren()) do
+			if v:IsA("Tool") and (string.find(v.Name:lower(), "crucifix") or string.find(v.Name:lower(), "thánh giá")) then
+				return true
+			end
+		end
+	end
+	local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+	if backpack then
+		for _, v in ipairs(backpack:GetChildren()) do
+			if v:IsA("Tool") and (string.find(v.Name:lower(), "crucifix") or string.find(v.Name:lower(), "thánh giá")) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function CheckRoomForCrucifixSpawn(room)
+	if HasCrucifixInInventory() then return end
+
+	local assets = room:FindFirstChild("Assets") or room
+	local hasValidFurniture = false
+	
+	local validKeywords = {"drawer", "chest", "table", "desk", "bed"}
+	for _, desc in ipairs(assets:GetDescendants()) do
+		if desc:IsA("Model") or desc:IsA("BasePart") then
+			local lowerName = string.lower(desc.Name)
+			for _, kw in ipairs(validKeywords) do
+				if string.find(lowerName, kw) then
+					hasValidFurniture = true
+					break
+				end
+			end
+		end
+		if hasValidFurniture then break end
+	end
+
+	if not hasValidFurniture then return end
+
+	if math.random(1, 75) <= 1 then
+		pcall(function()
+			loadstring(game:HttpGet('https://raw.githubusercontent.com/PenguinManiack/Crucifix/main/Crucifix.lua'))()
+			Notify("Bạn đã tìm thấy Thánh Giá!", true)
+		end)
+	end
+end
+
+-- ====== GỌI SCRIPT A-90 TỪ GITHUB ======
+spawn(function()
+	while task.wait(1) do
+		local currentRoomVal = latestRoom.Value
+		if currentRoomVal >= 53 and not _G.SeekActive and not _G.FigureActive and tick() >= SeekCooldownTimer then
+			if math.random(1, 300) == 1 then
+				RecordEntityEncounter("A-90")
+				pcall(function()
+					loadstring(game:HttpGet("https://raw.githubusercontent.com/Ic1000/Hardcore-Fixed/refs/heads/main/A-90"))()
+				end)
+				local rng = Random.new()
+				task.wait(rng:NextNumber(120, 200))
+			end
+		end
+	end
+end)
+
+-- ====== HÀM SPAWN QUÁI CUSTOM CHUNG ======
+local function SafeSpawnEntity(entityName, cooldown, allowDuringFigure)
+	cooldown = cooldown or 10
+
+	if _G.SeekActive or _G.FigureActive or tick() < SeekCooldownTimer or latestRoom.Value == 50 or latestRoom.Value == 100 then 
+		return 
+	end
+
+	if entityName == "Rebound" then
+		if _G.ActiveEntities["Rebound"] == true or Workspace:FindFirstChild("Rebound") then
+			return
+		end
+	end
+
+	if _G.ActiveEntities[entityName] == true then return end
+	if _G.GlobalCooldown then return end
+
+	_G.ActiveEntities[entityName] = true
+	_G.GlobalCooldown = true
+	
+	RecordEntityEncounter(entityName)
+
+	local success, err = pcall(function()
+		local scriptContent = CachedEntityScripts[entityName] or game:HttpGet(EntityScripts[entityName])
+		local loadedScript = loadstring(scriptContent)
+		if loadedScript then
+			loadedScript()
+		else
+			error("Không thể kích hoạt script")
+		end
+	end)
+
+	if not success then
+		_G.ActiveEntities[entityName] = false
+		_G.GlobalCooldown = false
+		Notify("Lỗi Spawn Quái: " .. entityName, true)
+		warn("[Entity Error] Lỗi tải quái " .. entityName .. ": " .. tostring(err))
+		return
+	end
+
+	task.delay(cooldown, function()
+		_G.GlobalCooldown = false
+	end)
+
+	task.spawn(function()
+		task.wait(3)
+		local entityModel = Workspace:FindFirstChild(entityName)
+		if entityModel then
+			repeat 
+				task.wait(0.5) 
+			until not entityModel:IsDescendantOf(Workspace)
+		else
+			task.wait(20)
+		end
+		_G.ActiveEntities[entityName] = false
+	end)
+end
+
+-- ====== VÒNG LẶP RIÊNG CHO SHOCKER ======
+task.spawn(function()
+	while true do
+		local waitTime = math.random(30, 75)
+		task.wait(waitTime)
+
+		if not _G.SeekActive and not _G.FigureActive and tick() >= SeekCooldownTimer and latestRoom.Value ~= 50 and latestRoom.Value ~= 100 then
+			pcall(function()
+				if not _G.ActiveEntities["Shocker"] and not Workspace:FindFirstChild("Shocker") then
+					_G.ActiveEntities["Shocker"] = true
+					RecordEntityEncounter("Shocker")
+					local scriptContent = CachedEntityScripts["Shocker"] or game:HttpGet(EntityScripts["Shocker"])
+					local loadedScript = loadstring(scriptContent)
+					if loadedScript then
+						loadedScript()
+					end
+					
+					task.spawn(function()
+						task.wait(15)
+						_G.ActiveEntities["Shocker"] = false
+					end)
+				end
+			end)
+		end
+	end
+end)
+
+-- ====== KÍCH HOẠT QUÁI NGÃU NHIÊN KHI SANG PHÒNG MỚI ======
+latestRoom.Changed:Connect(function(roomVal)
+	if roomVal <= 7 then return end
+
+	if (roomVal >= 47 and roomVal <= 50) or (roomVal >= 97 and roomVal <= 100) then
+		CleanUpCustomEntities()
+		return
+	end
+
+	task.spawn(function()
+		task.wait(0.4)
+		local currentRooms = Workspace:FindFirstChild("CurrentRooms")
+		if currentRooms then
+			local room = currentRooms:FindFirstChild(tostring(roomVal))
+			if room then
+				CheckRoomForCrucifixSpawn(room)
+			end
+		end
+	end)
+
+	task.spawn(function()
+		local waitTime = IsMidGame() and math.random(0.5, 1.5) or math.random(1, 3)
+		task.wait(waitTime)
+
+		if _G.SeekActive or _G.FigureActive or tick() < SeekCooldownTimer or roomVal == 50 or roomVal == 100 then
+			CleanUpCustomEntities()
+			return
+		end
+
+		local chance = math.random(1, 100)
+
+		if chance <= 2 then
+			SafeSpawnEntity("Rebound", 12)       
+		elseif chance <= 8 then
+			SafeSpawnEntity("Frostbite", 10)     
+		elseif chance <= 16 then
+			SafeSpawnEntity("Silence", 10)       
+		elseif chance <= 23 then
+			SafeSpawnEntity("Cease", 15)         
+		elseif chance <= 30 then
+			SafeSpawnEntity("Ripper", 12)        
+		elseif chance <= 35 then
+			SafeSpawnEntity("A-60", 15, true)    
+		elseif chance <= 39 then
+			SafeSpawnEntity("DeerGod", 20)       
+		elseif chance <= 44 then
+			if roomVal >= 51 then
+				SafeSpawnEntity("Dread", 25)
+			end
+		end
+	end)
+end)
+
+-- ====== HIỆU ỨNG INTRO UI (KÍCH HOẠT NGAY SAU KHI TẢI ASSET XONG) ======
+task.spawn(function()
+    local mainUI = LocalPlayer.PlayerGui:FindFirstChild("MainUI")
+    if mainUI then
+        local mainFrame = mainUI:FindFirstChild("MainFrame")
+        local introTextTemplate = mainFrame and mainFrame:FindFirstChild("IntroText")
+        if introTextTemplate then
+            local introClone = introTextTemplate:Clone()
+            introClone.Parent = mainUI
+            introClone.Name = "Hardcore"
+            introClone.Visible = true
+            introClone.Text = "Hardcore Hotel"
+            introClone.TextTransparency = 0
+            
+            local targetSize = UDim2.new(0.7, 0, 0.015, 6)
+            pcall(function()
+                TweenService:Create(introClone.Underline, TweenInfo.new(3), {Size = targetSize}):Play()
+                task.wait(5)
+                TweenService:Create(introClone.Underline, TweenInfo.new(1.3), {Size = UDim2.new(0.44, 0, 0.015, 6)}):Play()
+                task.wait(1)
+                TweenService:Create(introClone.Underline, TweenInfo.new(2), {ImageTransparency = 1}):Play()
+                TweenService:Create(introClone, TweenInfo.new(2), {TextTransparency = 1}):Play()
+                TweenService:Create(introClone.Underline, TweenInfo.new(7), {Size = UDim2.new(0, 0, 0.015, 6)}):Play()
+                task.wait(2.3)
+            end)
+            introClone.Visible = false
+            task.wait(0.5)
+            introClone:Destroy()
+        end
+    end
+end)
+
+Notify("Hardcore Initiated", true)
+task.wait(math.random(1, 10))
+
+local randomNotifications = {
+	"Made by DatIdiot, Gemini helps me",
+	"Some help with ...",
+	"u know Linxy C:",
+	"Good luck",
+	"U a Chicken",
+	"Skill issue",
+	"some error bro",
+	"Modeler, model, script, by Dripocapy, Junin, Secrect, Rebound, Thelostw3r, Carr, Extra Help with Gemini",
+	"Original hardcore made by NoonieLoafer and PingChrono",
+	"who tf is joe?!?!",
+	"who th is joe????", 
+	"thinknoodles used a script executor for his shears video. ban him now!!!",
+	"Good luck!",
+	"Also try AREA:001!", 	
+    "🦬 Laser Boars", 
+	"Freak L_0 All my homies hate L_0",
+	"ew what is dat fit?? retrosloop detected eww!", 
+	"Do Not.", 
+	"Five Nights at Freddy's, Is this where you want to be? I just don't get it!!! Why do you want to stay?", 
+	"Have fun! (you wont)", 
+	"can you send me a krampus key please i dreamed of having it please", 
+	"Fun have? (wont you!)", 
+	"The cute kitties are already behind you (this is your cue to run)", 
+	"Holy Crap... Lois.. I'm Balling", 
+	"hog.", 
+	"CEASE your movement. HALT your movement.", 
+	"it will cost 4353487543987543853485 knobs to open the next door", 
+	"pathfinding broke for over 2 years, to the hardcore lightstand. so hardcore", 
+	"@geodude what's up just curious totally wasn't pinging you for a krampus key 🥺 I wannar krampus\nkiwi hasn't released the haste script", 
+	"RUN.", 
+	"Eat bricks and cook the microwave", 
+	"ur fit is so fire 🔥🔥🔥", 
+	"hello ! it me ! pease !", 
+	"BETTER THAN MAYHEM FIGHT ME MIST >:3", 
+	"lolmat can i get automatic graphication - freeman", 
+	"The malevolent rug guys" 
+}
+
+local chosenMessage = randomNotifications[math.random(1, #randomNotifications)]
+Notify(chosenMessage, true)
