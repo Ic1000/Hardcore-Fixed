@@ -1,5 +1,5 @@
 -- ========================================================
---     DEER GOD & VYNIXU NODE SPAWNER V2 (FIXED ACHIEVEMENT)
+--     DEER GOD & VYNIXU NODE SPAWNER V2 (FIXED BUG)
 -- ========================================================
 
 local Players = game:GetService("Players")
@@ -25,6 +25,7 @@ local hit = false
 local new = false
 local huh = false
 local found = false
+local isDeactivated = false -- Cờ kiểm soát trạng thái hoạt động của thực thể
 
 -- Đảm bảo thành tựu chỉ được cấp 1 lần duy nhất trong toàn bộ phiên chơi
 if not getgenv().DeerGodBadgeGranted then
@@ -116,7 +117,7 @@ task.spawn(function()
         local nodeObj = Workspace:WaitForChild("node", 5)
         if nodeObj then
             RunService.RenderStepped:Connect(function()
-                if hit or not nodeObj.Parent then return end
+                if hit or isDeactivated or not nodeObj.Parent then return end
                 if nodeObj and nodeObj.Parent and ambush and ambush.Parent then
                     if nodeObj.PrimaryPart then
                         nodeObj:SetPrimaryPartCFrame(ambush.CFrame)
@@ -131,10 +132,10 @@ task.spawn(function()
     entity:Run()
 end)
 
--- Mechanism: Take Damage when Looking
+-- Mechanism: Take Damage when Looking (Đã thêm chặn khi isDeactivated)
 task.spawn(function()
     while task.wait(1.5) do
-        if hit or getgenv().DeerGodBadgeGranted then break end
+        if hit or isDeactivated or getgenv().DeerGodBadgeGranted then break end
         if character:GetAttribute("Hiding") then continue end
         local origin = ambush.Position
         local direction = (HumanoidRootPart.Position - origin).Unit
@@ -149,10 +150,10 @@ task.spawn(function()
     end
 end)
 
--- Mechanism: Kill/Jumpscare on Close Hitbox
+-- Mechanism: Kill/Jumpscare on Close Hitbox (Đã thêm chặn khi isDeactivated)
 task.spawn(function()
     while task.wait(0.5) do
-        if hit then break end
+        if hit or isDeactivated then break end
         if character:GetAttribute("Hiding") then continue end
         local hitbox = 9
         local origin = ambush.Position
@@ -162,7 +163,8 @@ task.spawn(function()
 
         if result and result.Instance.Parent == character then
             found = true
-            hit = true -- Đánh dấu người chơi đã chết để chặn thành tựu
+            hit = true
+            isDeactivated = true -- Ngắt toàn bộ tương tác ngay lập tức
             local nodeObj = Workspace:FindFirstChild("node")
             if nodeObj then nodeObj:Destroy() end
             if deer and deer.Parent then pcall(function() deer:Destroy() end) end
@@ -341,25 +343,40 @@ ReplicatedStorage.GameData.LatestRoom.Changed:Connect(function()
     room5 = rooms:FindFirstChild(value - 5)
 end)
 
+-- ========================================================
+--         PHẦN SỬA LỖI: CHẶN XUNG ĐỘT DI CHUYỂN & DESTROY
+-- ========================================================
+
+local isChasing = false -- Biến cờ kiểm tra xem quái có đang rượt người chơi hay không
+
 -- Tracking Line of Sight & Following
 task.spawn(function()
-    while task.wait(0.5) do
-        if huh or hit then break end
-        new = true
-        local hitbox = 50
+    while task.wait(0.3) do
+        if huh or hit or isDeactivated then break end
+        if character:GetAttribute("Hiding") then continue end
+        
+        local hitbox = 60 -- Tầm nhìn để quái phát hiện ra bạn
         local origin = ambush.Position
         local direction = (HumanoidRootPart.Position - origin).Unit
         local ray = Ray.new(origin, direction * hitbox)
         local raycast = Workspace:Raycast(ray.Origin, ray.Direction)
+        
         if raycast and raycast.Instance.Parent == character then
             found = true
+            isChasing = true -- Đánh dấu là đang rượt người chơi -> Dừng việc chạy theo phòng lại!
+            
+            -- Hủy tween di chuyển cũ của phòng (nếu có) để mượt hơn
+            pcall(function() TweenService:Cancel(ambush) end)
+            
             task.spawn(function()
                 while task.wait() do
-                    if hit then break end
-                    local follow = TweenService:Create(ambush, TweenInfo.new(5), {CFrame = HumanoidRootPart.CFrame})
+                    if hit or isDeactivated then break end
+                    -- Quái sẽ liên tục lao thẳng theo vị trí của bạn với tốc độ mượt
+                    local follow = TweenService:Create(ambush, TweenInfo.new(0.8, Enum.EasingStyle.Linear), {CFrame = HumanoidRootPart.CFrame})
                     follow:Play()
                 end
             end)
+            break -- Thoát vòng quét tầm nhìn vì đã bắt đầu rượt đuổi
         end
     end
 end)
@@ -371,12 +388,13 @@ elseif room and room:FindFirstChild("RoomEntrance") then
     ambush.CFrame = room.RoomEntrance.CFrame * CFrame.new(0, 0, 50)
 end
 
--- Di chuyển Deer God xuyên qua các phòng phía sau đến phòng tiếp theo
+-- Di chuyển Deer God xuyên qua các phòng phía sau (Có kiểm tra cờ isChasing)
 task.spawn(function()
     local function moveToRoom(targetRoom)
-        if hit then return end
+        -- Nếu quái đã chết, đã vô hiệu hóa, hoặc đang rượt người chơi thì huỷ lịch trình chạy phòng
+        if hit or isDeactivated or isChasing then return end 
         if targetRoom and targetRoom:FindFirstChild("RoomEntrance") then
-            local tween = TweenService:Create(ambush, TweenInfo.new(5, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {CFrame = targetRoom.RoomEntrance.CFrame})
+            local tween = TweenService:Create(ambush, TweenInfo.new(4, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {CFrame = targetRoom.RoomEntrance.CFrame})
             tween:Play()
             tween.Completed:Wait()
         end
@@ -389,36 +407,41 @@ task.spawn(function()
     moveToRoom(room)
     moveToRoom(nextroom)
 
-    if not hit and nextroom and nextroom:FindFirstChild("RoomExit") then
-        local tweenExit = TweenService:Create(ambush, TweenInfo.new(5, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {CFrame = nextroom.RoomExit.CFrame})
+    if not hit and not isDeactivated and not isChasing and nextroom and nextroom:FindFirstChild("RoomExit") then
+        local tweenExit = TweenService:Create(ambush, TweenInfo.new(4, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {CFrame = nextroom.RoomExit.CFrame})
         tweenExit:Play()
         tweenExit.Completed:Wait()
     end
 
-    -- Kiểm tra điều kiện sống sót để cấp thành tựu 1 lần duy nhất
-    if not hit and not getgenv().DeerGodBadgeGranted then
-        getgenv().DeerGodBadgeGranted = true
-        if deer and deer.Parent then pcall(function() deer:Destroy() end) end
-        local nodeObj = Workspace:FindFirstChild("node")
-        if nodeObj then nodeObj:Destroy() end
-        
-        local success, achievementGiver = pcall(function()
-            return loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
-        end)
-        if success and achievementGiver then
-            pcall(function()
-                achievementGiver({
-                    Title = "Last Chance To Look Away",
-                    Desc = "Why are you running?",
-                    Reason = "Survive the rare Entity called Deer God",
-                    Image = "rbxassetid://114825307168774"
-                })
+    -- Nếu quái chạy hết đường mà chưa kịp bắt người chơi (người chơi sống sót)
+    if not isChasing then
+        isDeactivated = true
+
+        -- Kiểm tra điều kiện sống sót để cấp thành tựu 1 lần duy nhất
+        if not hit and not getgenv().DeerGodBadgeGranted then
+            getgenv().DeerGodBadgeGranted = true
+            if deer and deer.Parent then pcall(function() deer:Destroy() end) end
+            local nodeObj = Workspace:FindFirstChild("node")
+            if nodeObj then nodeObj:Destroy() end
+            
+            local success, achievementGiver = pcall(function()
+                return loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
             end)
+            if success and achievementGiver then
+                pcall(function()
+                    achievementGiver({
+                        Title = "Last Chance To Look Away",
+                        Desc = "Why are you running?",
+                        Reason = "Survive the rare Entity called Deer God",
+                        Image = "rbxassetid://114825307168774"
+                    })
+                end)
+            end
+        else
+            if deer and deer.Parent then pcall(function() deer:Destroy() end) end
+            local nodeObj = Workspace:FindFirstChild("node")
+            if nodeObj then nodeObj:Destroy() end
         end
-    else
-        if deer and deer.Parent then pcall(function() deer:Destroy() end) end
-        local nodeObj = Workspace:FindFirstChild("node")
-        if nodeObj then nodeObj:Destroy() end
     end
 end)
 
