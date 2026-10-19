@@ -376,7 +376,7 @@ local entity = spawner.Create({
 	},
 	Movement = {
 		Speed = math.random(267, 350),
-		Delay = 0,
+		Delay = math.random(1, 1.5),
 		Reversed = false
 	},
 	Rebounding = {
