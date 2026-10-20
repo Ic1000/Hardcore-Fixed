@@ -1,33 +1,28 @@
--- ========================================================
---     DEER GOD & VYNIXU NODE SPAWNER V2 (FIXED BUG)
--- ========================================================
+---====== Load spawner ======---
+
+local spawner = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Entity%20Spawner/V2/Source.lua"))()
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local HumanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
--- Check phòng hợp lệ
-if Workspace.CurrentRooms:FindFirstChild("50") 
-    or Workspace.CurrentRooms:FindFirstChild("100") 
-    or ReplicatedStorage.GameData.LatestRoom.Value == 6 then
-    repeat task.wait() until not Workspace.CurrentRooms:FindFirstChild("50") 
-        and not Workspace.CurrentRooms:FindFirstChild("100")
-        and not (ReplicatedStorage.GameData.LatestRoom.Value == 6)
-end
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    HumanoidRootPart = character:WaitForChild("HumanoidRootPart")
+end)
 
 local hit = false
-local new = false
-local huh = false
-local found = false
-local isDeactivated = false -- Cờ kiểm soát trạng thái hoạt động của thực thể
+local isDeactivated = false
+local currentTween = nil
+local chaseSound = nil
 
--- Đảm bảo thành tựu chỉ được cấp 1 lần duy nhất trong toàn bộ phiên chơi
 if not getgenv().DeerGodBadgeGranted then
     getgenv().DeerGodBadgeGranted = false
 end
@@ -41,412 +36,371 @@ end)
 camShake:Start()
 camShake:Shake(CameraShaker.Presets.Earthquake)
 
+-- Hàm tải và tạo Sound chuẩn hóa
 local function GetGitSound(GithubSnd, SoundName)
-    local url = GithubSnd
-    if not isfile(SoundName .. ".mp3") then
-        writefile(SoundName .. ".mp3", game:HttpGet(url))
-    end
     local sound = Instance.new("Sound")
-    sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
+    sound.Name = SoundName
+    sound.Volume = 3
+    sound.Looped = true
+    sound.RollOffMaxDistance = 600
+    sound.RollOffMinDistance = 10
+
+    local success = pcall(function()
+        if not isfile(SoundName .. ".mp3") then
+            writefile(SoundName .. ".mp3", game:HttpGet(GithubSnd))
+        end
+        sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
+    end)
+
+    if not success or not sound.SoundId or sound.SoundId == "" then
+        sound.SoundId = "rbxassetid://9125992545" -- Dự phòng nếu executor lỗi
+    end
+
     return sound
 end
 
--- Load Deer Model
-local deer = game:GetObjects("rbxassetid://86055776714285")[1]
-deer.Parent = Workspace
-deer.PrimaryPart = deer:FindFirstChildWhichIsA("BasePart")
-deer.PrimaryPart.Anchored = true
-deer.PrimaryPart.CanCollide = false
-deer.Name = "Deer"
-local ambush = deer.PrimaryPart
+---====== Create entity ======---
 
--- Spawner Vynixu V2 cho node (Bám sát DeerGod)
-task.spawn(function()
-    local spawner = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Entity%20Spawner/V2/Source.lua"))()
+local entity = spawner.Create({
+	Entity = {
+		Name = "DeerGod",
+		Asset = "rbxassetid://86055776714285",
+		HeightOffset = 0
+	},
+	Lights = {
+		Flicker = {
+			Enabled = true,
+			Duration = 10
+		},
+		Shatter = true,
+		Repair = false
+	},
+	Earthquake = {
+		Enabled = false
+	},
+	CameraShake = {
+		Enabled = true,
+		Range = 100,
+		Values = {3.5, 20, 0.1, 1}
+	},
+	Movement = {
+		Speed = 30,
+		Delay = 2,
+		Reversed = false
+	},
+	Rebounding = {
+		Enabled = false
+	},
+	Damage = {
+		Enabled = false,
+		Range = 0,
+		Amount = 0
+	},
+	Crucifixion = {
+		Enabled = true,
+		Range = 40,
+		Resist = false,
+		Break = true
+	},
+	Death = {
+		Type = "Guiding",
+		Hints = {"Claim has seen you.", "It will consume anyone on sight.", "Do not look at it directly for too long!"},
+		Cause = "DeerGod"
+	}
+})
 
-    local entity = spawner.Create({
-        Entity = {
-            Name = "node",
-            Asset = "rbxassetid://83406552862223",
-            HeightOffset = 0
-        },
-        Lights = {
-            Flicker = {
-                Enabled = true,
-                Duration = 10
-            },
-            Shatter = false,
-            Repair = false
-        },
-        Earthquake = {
-            Enabled = false
-        },
-        CameraShake = {
-            Enabled = true,
-            Range = 100,
-            Values = {3.5, 20, 0.1, 1}
-        },
-        Movement = {
-            Speed = 0,
-            Delay = 0,
-            Reversed = false
-        },
-        Rebounding = {
-            Enabled = false
-        },
-        Damage = {
-            Enabled = false,
-            Range = 0,
-            Amount = 0
-        },
-        Crucifixion = {
-            Enabled = true
-        },
-        Death = {
-            Type = "Guiding",
-            Hints = {
-                "Claim has seen you.", 
-                "It will consume anyone on sight.",
-                "Do not look at it directly for too long!"
-            },
-            Cause = "DeerGod"
-        }
-    })
+local entityModel = nil
 
-    entity:SetCallback("OnSpawned", function()
-        local nodeObj = Workspace:WaitForChild("node", 5)
-        if nodeObj then
-            RunService.RenderStepped:Connect(function()
-                if hit or isDeactivated or not nodeObj.Parent then return end
-                if nodeObj and nodeObj.Parent and ambush and ambush.Parent then
-                    if nodeObj.PrimaryPart then
-                        nodeObj:SetPrimaryPartCFrame(ambush.CFrame)
-                    else
-                        nodeObj:PivotTo(ambush.CFrame)
-                    end
-                end
+-- Hàm dừng và xóa nhạc Chase an toàn
+local function StopChaseSound()
+    if chaseSound then
+        pcall(function()
+            chaseSound:Stop()
+            chaseSound:Destroy()
+        end)
+        chaseSound = nil
+    end
+end
+
+-- Hàm cấp huy hiệu an toàn (Đã fix lỗi thiếu end và check chuẩn Humanoid)
+local function GrantBadge()
+    if not hit and not getgenv().DeerGodBadgeGranted then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.Health > 0 then
+            getgenv().DeerGodBadgeGranted = true
+            pcall(function()
+                local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
+                achievementGiver({
+                    Title = "Last Chance To Look Away",
+                    Desc = "Why are you running?",
+                    Reason = "Survive the rare Entity called Deer God",
+                    Image = "rbxassetid://114825307168774"
+                })
             end)
+        end
+    end
+end
+
+-- Hàm xử lý Jumpscare và kết liễu người chơi
+local function TriggerJumpscare()
+    if hit then return end
+    hit = true
+    isDeactivated = true
+    
+    StopChaseSound()
+    if currentTween then pcall(function() currentTween:Cancel() end) end
+    if entityModel and entityModel.Parent then pcall(function() entityModel:Destroy() end) end
+    
+    local playergui = player:WaitForChild("PlayerGui")
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Parent = playergui
+    screenGui.Name = "Screen Gui"
+    screenGui.IgnoreGuiInset = true
+
+    local stop = false
+    local done = false
+
+    local kill = Instance.new("Sound")
+    kill.Parent = SoundService
+    kill.PlaybackSpeed = 3
+    kill.SoundId = "rbxassetid://5263560896"
+    kill.Name = "Dear god death sound chat"
+    kill.Volume = 5
+    kill.Looped = true
+
+    local flange = Instance.new("FlangeSoundEffect")
+    flange.Parent = kill; flange.Depth = 1; flange.Mix = 1; flange.Rate = 0.2
+    local trem = Instance.new("TremoloSoundEffect")
+    trem.Parent = kill; trem.Depth = 1; trem.Duty = 0.94; trem.Frequency = 20
+    local pitch = Instance.new("PitchShiftSoundEffect")
+    pitch.Parent = kill; pitch.Octave = 0.5
+    local distort = Instance.new("DistortionSoundEffect")
+    distort.Parent = kill; distort.Level = 0.98
+
+    kill:Play()
+
+    local Backgroun = Instance.new("ImageLabel")
+    Backgroun.Parent = screenGui
+    Backgroun.Size = UDim2.new(1, 0, 1, 0)
+    Backgroun.ImageTransparency = 1
+    Backgroun.BackgroundTransparency = 0
+    Backgroun.BackgroundColor3 = Color3.new(0, 0, 0)
+    Backgroun.Image = "rbxassetid://105983470581183"
+
+    local face = Instance.new("ImageLabel")
+    face.Parent = screenGui
+    face.AnchorPoint = Vector2.new(0.5, 0.5)
+    face.Position = UDim2.new(0.5, 0, 0.589, 0)
+    face.Size = UDim2.new(0, 860, 0, 860)
+    face.Image = "rbxassetid://73683518024275"
+    face.ImageTransparency = 0
+    face.BackgroundTransparency = 1
+
+    task.spawn(function()
+        while task.wait() do
+            if stop then break end
+            Backgroun.BackgroundTransparency = 0; Backgroun.ImageTransparency = 1
+            task.wait(0.1)
+            Backgroun.BackgroundTransparency = 1; Backgroun.ImageTransparency = 0
         end
     end)
 
-    entity:Run()
+    task.spawn(function()
+        while task.wait() do
+            if stop then break end
+            Backgroun.Image = "rbxassetid://131073231978514"
+            task.wait(0.0589)
+            Backgroun.Image = "rbxassetid://105841646930424"
+        end
+    end)
+
+    task.spawn(function()
+        while task.wait() do
+            if stop then break end
+            face.Rotation = 2; face.Image = "rbxassetid://122859819664215"
+            task.wait(0.0589)
+            face.Rotation = -2; face.Image = "rbxassetid://84489429478798"
+            task.wait(0.0589)
+            face.Rotation = 2; face.Image = "rbxassetid://73683518024275"
+            task.wait(0.0589)
+            face.Rotation = -2
+        end
+    end)
+
+    local text = Instance.new("ImageLabel")
+    text.Parent = screenGui
+    text.AnchorPoint = Vector2.new(0.5, 0.5)
+    text.Position = UDim2.new(0.5, 0, 0.5, 0)
+    text.Size = UDim2.new(0, 300, 0, 300)
+    text.Image = "rbxassetid://117106082021449"
+    text.ImageTransparency = 0
+    text.BackgroundTransparency = 1
+
+    task.spawn(function()
+        while task.wait() do
+            if stop then break end
+            text.Image = "rbxassetid://89229444931090"
+            task.wait(0.0589)
+            text.Image = "rbxassetid://117106082021449"
+        end
+    end)
+
+    task.spawn(function()
+        while task.wait() do
+            if stop then break end
+            text.Position = UDim2.new(Random.new():NextNumber(0, 0.5), 0, Random.new():NextNumber(0, 0.6), 0)
+            task.wait()
+        end
+    end)
+
+    task.spawn(function()
+        while task.wait() do
+            if stop then break end
+            text.ImageTransparency = 0; task.wait()
+            text.ImageTransparency = 1
+        end
+    end)
+
+    wait(1.6)
+    stop = true
+    kill:Stop()
+    
+    task.spawn(function()
+        while task.wait() do
+            if done then break end
+            face.ImageTransparency = 1
+            text.ImageTransparency = 1
+            Backgroun.ImageTransparency = 1
+            Backgroun.BackgroundTransparency = 1
+        end
+    end)
+                    
+    pcall(function() 
+        local remoteFolder = ReplicatedStorage:FindFirstChild("RemotesFolder")
+        if remoteFolder and remoteFolder:FindFirstChild("DeathHint") then
+            firesignal(remoteFolder.DeathHint.OnClientEvent, {
+                "You died to Deer God...",
+                "It consumes anyone on sight.",
+                "Do not observe it directly for too long!"
+            }, "Blue")
+        end                    
+    end)
+                    
+    task.wait(0.2)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then humanoid.Health = 0 end
+    task.wait(3)
+    done = true
+end
+
+---====== Callbacks & Custom Logic ======---
+
+entity:SetCallback("OnSpawned", function()
+    print("DeerGod has spawned via Spawner V2")
+    
+    task.spawn(function()
+        entityModel = Workspace:WaitForChild("DeerGod", 5)
+        if entityModel then
+            local primary = entityModel.PrimaryPart or entityModel:FindFirstChildWhichIsA("BasePart")
+            if primary then
+                chaseSound = GetGitSound("https://github.com/Tinkgy111/Bang/raw/main/followed.mp3", "chase_deergod")
+                chaseSound.Parent = primary
+                chaseSound:Play()
+            end
+        end
+    end)
 end)
 
--- Mechanism: Take Damage when Looking (Đã thêm chặn khi isDeactivated)
+-- Mechanism: Raycast phát hiện người chơi -> Lao tới đuổi -> Núp tủ thì dừng -> Hitbox 9 Jumpscare
+task.spawn(function()
+    while task.wait(0.3) do
+        if hit or isDeactivated then break end
+        if not entityModel or not entityModel.Parent then continue end
+        if character:GetAttribute("Hiding") then continue end
+        
+        local primary = entityModel.PrimaryPart or entityModel:FindFirstChildWhichIsA("BasePart")
+        if not primary then continue end
+
+        local origin = primary.Position
+        local direction = (HumanoidRootPart.Position - origin).Unit
+        local ray = Ray.new(origin, direction * 60)
+        local raycast = Workspace:Raycast(ray.Origin, ray.Direction)
+        
+        if raycast and raycast.Instance.Parent == character then
+            local isChasing = true
+            
+            while isChasing and not hit and not isDeactivated do
+                if character:GetAttribute("Hiding") then
+                    isChasing = false
+                    break
+                end
+
+                local hitbox = 9
+                local hitOrigin = primary.Position
+                local hitDirection = (HumanoidRootPart.Position - hitOrigin).Unit
+                local hitRay = Ray.new(hitOrigin, hitDirection * hitbox)
+                local hitResult = Workspace:Raycast(hitRay.Origin, hitRay.Direction)
+
+                if hitResult and hitResult.Instance.Parent == character and not character:GetAttribute("Hiding") then
+                    TriggerJumpscare()
+                    break
+                end
+
+                if currentTween then pcall(function() currentTween:Cancel() end) end
+                currentTween = TweenService:Create(primary, TweenInfo.new(2, Enum.EasingStyle.Linear), {CFrame = HumanoidRootPart.CFrame})
+                currentTween:Play()
+                currentTween.Completed:Wait()
+            end
+        end
+    end
+end)
+
+-- Mechanism: Take Damage when Looking (Gây sát thương nếu nhìn trực diện)
 task.spawn(function()
     while task.wait(1.5) do
         if hit or isDeactivated or getgenv().DeerGodBadgeGranted then break end
+        if not entityModel or not entityModel.Parent then continue end
         if character:GetAttribute("Hiding") then continue end
-        local origin = ambush.Position
+        
+        local primary = entityModel.PrimaryPart or entityModel:FindFirstChildWhichIsA("BasePart")
+        if not primary then continue end
+
+        local origin = primary.Position
         local direction = (HumanoidRootPart.Position - origin).Unit
         local ray = Ray.new(origin, direction * 5050)
         local cast = Workspace:Raycast(ray.Origin, ray.Direction)
         if cast and cast.Instance.Parent == character then
-            local _, onScreen = Workspace.CurrentCamera:WorldToScreenPoint(ambush.Position)
-            if onScreen then
-                player.Character.Humanoid:TakeDamage(8)
+            local _, onScreen = Workspace.CurrentCamera:WorldToScreenPoint(primary.Position)
+            if onScreen and not character:GetAttribute("Hiding") then
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then humanoid:TakeDamage(8) end
             end
         end
     end
 end)
 
--- Mechanism: Kill/Jumpscare on Close Hitbox (Đã thêm chặn khi isDeactivated)
-task.spawn(function()
-    while task.wait(0.5) do
-        if hit or isDeactivated then break end
-        if character:GetAttribute("Hiding") then continue end
-        local hitbox = 9
-        local origin = ambush.Position
-        local direction = (HumanoidRootPart.Position - origin).Unit
-        local ray = Ray.new(origin, direction * hitbox)
-        local result = Workspace:Raycast(ray.Origin, ray.Direction)
-
-        if result and result.Instance.Parent == character then
-            found = true
-            hit = true
-            isDeactivated = true -- Ngắt toàn bộ tương tác ngay lập tức
-            local nodeObj = Workspace:FindFirstChild("node")
-            if nodeObj then nodeObj:Destroy() end
-            if deer and deer.Parent then pcall(function() deer:Destroy() end) end
-            
-            local playergui = player:WaitForChild("PlayerGui")
-            local screenGui = Instance.new("ScreenGui")
-            screenGui.Parent = playergui
-            screenGui.Name = "Screen Gui"
-            screenGui.IgnoreGuiInset = true
-
-            local stop = false
-            local done = false
-
-            local kill = Instance.new("Sound")
-            kill.Parent = Workspace
-            kill.PlaybackSpeed = 3
-            kill.SoundId = "rbxassetid://5263560896"
-            kill.Name = "Dear god death sound chat"
-            kill.Volume = 5
-            kill.Looped = true
-
-            local flange = Instance.new("FlangeSoundEffect")
-            flange.Parent = kill; flange.Depth = 1; flange.Mix = 1; flange.Rate = 0.2
-            local trem = Instance.new("TremoloSoundEffect")
-            trem.Parent = kill; trem.Depth = 1; trem.Duty = 0.94; trem.Frequency = 20
-            local pitch = Instance.new("PitchShiftSoundEffect")
-            pitch.Parent = kill; pitch.Octave = 0.5
-            local distort = Instance.new("DistortionSoundEffect")
-            distort.Parent = kill; distort.Level = 0.98
-
-            kill:Play()
-
-            local Backgroun = Instance.new("ImageLabel")
-            Backgroun.Parent = screenGui
-            Backgroun.Size = UDim2.new(1, 0, 1, 0)
-            Backgroun.ImageTransparency = 1
-            Backgroun.BackgroundTransparency = 0
-            Backgroun.BackgroundColor3 = Color3.new(0, 0, 0)
-            Backgroun.Image = "rbxassetid://105983470581183"
-
-            local face = Instance.new("ImageLabel")
-            face.Parent = screenGui
-            face.AnchorPoint = Vector2.new(0.5, 0.5)
-            face.Position = UDim2.new(0.5, 0, 0.589, 0)
-            face.Size = UDim2.new(0, 860, 0, 860)
-            face.Image = "rbxassetid://73683518024275"
-            face.ImageTransparency = 0
-            face.BackgroundTransparency = 1
-
-            task.spawn(function()
-                while task.wait() do
-                    if stop then break end
-                    Backgroun.BackgroundTransparency = 0; Backgroun.ImageTransparency = 1
-                    task.wait(0.1)
-                    Backgroun.BackgroundTransparency = 1; Backgroun.ImageTransparency = 0
-                end
+entity:SetCallback("OnDespawning", function()
+    print("Entity is despawning")
+    isDeactivated = true
+    StopChaseSound()
+    
+    GrantBadge()
+    
+    task.delay(1, function()
+        if entityModel and entityModel.Parent then
+            pcall(function()
+                entityModel:Destroy()
             end)
-
-            task.spawn(function()
-                while task.wait() do
-                    if stop then break end
-                    Backgroun.Image = "rbxassetid://131073231978514"
-                    task.wait(0.0589)
-                    Backgroun.Image = "rbxassetid://105841646930424"
-                end
-            end)
-
-            task.spawn(function()
-                while task.wait() do
-                    if stop then break end
-                    face.Rotation = 2; face.Image = "rbxassetid://122859819664215"
-                    task.wait(0.0589)
-                    face.Rotation = -2; face.Image = "rbxassetid://84489429478798"
-                    task.wait(0.0589)
-                    face.Rotation = 2; face.Image = "rbxassetid://73683518024275"
-                    task.wait(0.0589)
-                    face.Rotation = -2
-                end
-            end)
-
-            local text = Instance.new("ImageLabel")
-            text.Parent = screenGui
-            text.AnchorPoint = Vector2.new(0.5, 0.5)
-            text.Position = UDim2.new(0.5, 0, 0.5, 0)
-            text.Size = UDim2.new(0, 300, 0, 300)
-            text.Image = "rbxassetid://117106082021449"
-            text.ImageTransparency = 0
-            text.BackgroundTransparency = 1
-
-            task.spawn(function()
-                while task.wait() do
-                    if stop then break end
-                    text.Image = "rbxassetid://89229444931090"
-                    task.wait(0.0589)
-                    text.Image = "rbxassetid://117106082021449"
-                end
-            end)
-
-            task.spawn(function()
-                while task.wait() do
-                    if stop then break end
-                    text.Position = UDim2.new(Random.new():NextNumber(0, 0.5), 0, Random.new():NextNumber(0, 0.6), 0)
-                    task.wait()
-                end
-            end)
-
-            task.spawn(function()
-                while task.wait() do
-                    if stop then break end
-                    text.ImageTransparency = 0; task.wait()
-                    text.ImageTransparency = 1
-                end
-            end)
-
-            wait(1.6)
-            stop = true
-            kill:Stop()
-            
-            task.spawn(function()
-                while task.wait() do
-                    if done then break end
-                    face.ImageTransparency = 1
-                    text.ImageTransparency = 1
-                    Backgroun.ImageTransparency = 1
-                    Backgroun.BackgroundTransparency = 1
-                end
-            end)
-           
-            pcall(function() 
-                local remoteFolder = ReplicatedStorage:FindFirstChild("RemotesFolder")
-                if remoteFolder and remoteFolder:FindFirstChild("DeathHint") then
-                    firesignal(remoteFolder.DeathHint.OnClientEvent, {
-                        "You died to Deer God...",
-                        "It consumes anyone on sight.",
-                        "Do not observe it directly for too long!"
-                    }, "Blue")
-                end                    
-                
-                local playerStats = ReplicatedStorage:FindFirstChild("GameStats")
-                if playerStats then
-                    local targetedFolder = playerStats:FindFirstChild("Player_" .. player.Name)
-                    if targetedFolder and targetedFolder:FindFirstChild("Total") and targetedFolder.Total:FindFirstChild("DeathCause") then
-                        targetedFolder.Total.DeathCause.Value = "DeerGod"
-                    end
-                end
-            end)
-                            
-            task.wait(0.2)
-            player.Character.Humanoid.Health = 0
-            task.wait(3)
-            done = true
         end
-    end
+    end)
 end)
 
--- Map Tracking Logic (Các phòng đằng sau)
-local rooms = Workspace.CurrentRooms
-local value = ReplicatedStorage.GameData.LatestRoom.Value
-
-local nextroom = rooms:FindFirstChild(value + 1)
-local room = rooms:FindFirstChild(value)
-local room1 = rooms:FindFirstChild(value - 1)
-local room2 = rooms:FindFirstChild(value - 2)
-local room3 = rooms:FindFirstChild(value - 3)
-local room4 = rooms:FindFirstChild(value - 4)
-local room5 = rooms:FindFirstChild(value - 5)
-
-ReplicatedStorage.GameData.LatestRoom.Changed:Connect(function()
-    value = ReplicatedStorage.GameData.LatestRoom.Value
-    nextroom = rooms:FindFirstChild(value + 1)
-    room = rooms:FindFirstChild(value)
-    room1 = rooms:FindFirstChild(value - 1)
-    room2 = rooms:FindFirstChild(value - 2)
-    room3 = rooms:FindFirstChild(value - 3)
-    room4 = rooms:FindFirstChild(value - 4)
-    room5 = rooms:FindFirstChild(value - 5)
+entity:SetCallback("OnDespawned", function()
+    print("Entity has despawned")
+    StopChaseSound()
+    GrantBadge()
 end)
 
--- ========================================================
---         PHẦN SỬA LỖI: CHẶN XUNG ĐỘT DI CHUYỂN & DESTROY
--- ========================================================
+---====== Run entity ======---
 
-local isChasing = false -- Biến cờ kiểm tra xem quái có đang rượt người chơi hay không
-
--- Tracking Line of Sight & Following
-task.spawn(function()
-    while task.wait(0.3) do
-        if huh or hit or isDeactivated then break end
-        if character:GetAttribute("Hiding") then continue end
-        
-        local hitbox = 60 -- Tầm nhìn để quái phát hiện ra bạn
-        local origin = ambush.Position
-        local direction = (HumanoidRootPart.Position - origin).Unit
-        local ray = Ray.new(origin, direction * hitbox)
-        local raycast = Workspace:Raycast(ray.Origin, ray.Direction)
-        
-        if raycast and raycast.Instance.Parent == character then
-            found = true
-            isChasing = true -- Đánh dấu là đang rượt người chơi -> Dừng việc chạy theo phòng lại!
-            
-            -- Hủy tween di chuyển cũ của phòng (nếu có) để mượt hơn
-            pcall(function() TweenService:Cancel(ambush) end)
-            
-            task.spawn(function()
-                while task.wait() do
-                    if hit or isDeactivated then break end
-                    -- Quái sẽ liên tục lao thẳng theo vị trí của bạn với tốc độ mượt
-                    local follow = TweenService:Create(ambush, TweenInfo.new(0.8, Enum.EasingStyle.Linear), {CFrame = HumanoidRootPart.CFrame})
-                    follow:Play()
-                end
-            end)
-            break -- Thoát vòng quét tầm nhìn vì đã bắt đầu rượt đuổi
-        end
-    end
-end)
-
--- Set CFrame khởi tạo ở phòng đằng sau (room5)
-if room5 then
-    ambush.CFrame = room5.RoomEntrance.CFrame
-elseif room and room:FindFirstChild("RoomEntrance") then
-    ambush.CFrame = room.RoomEntrance.CFrame * CFrame.new(0, 0, 50)
-end
-
--- Di chuyển Deer God xuyên qua các phòng phía sau (Có kiểm tra cờ isChasing)
-task.spawn(function()
-    local function moveToRoom(targetRoom)
-        -- Nếu quái đã chết, đã vô hiệu hóa, hoặc đang rượt người chơi thì huỷ lịch trình chạy phòng
-        if hit or isDeactivated or isChasing then return end 
-        if targetRoom and targetRoom:FindFirstChild("RoomEntrance") then
-            local tween = TweenService:Create(ambush, TweenInfo.new(4, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {CFrame = targetRoom.RoomEntrance.CFrame})
-            tween:Play()
-            tween.Completed:Wait()
-        end
-    end
-
-    moveToRoom(room4)
-    moveToRoom(room3)
-    moveToRoom(room2)
-    moveToRoom(room1)
-    moveToRoom(room)
-    moveToRoom(nextroom)
-
-    if not hit and not isDeactivated and not isChasing and nextroom and nextroom:FindFirstChild("RoomExit") then
-        local tweenExit = TweenService:Create(ambush, TweenInfo.new(4, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {CFrame = nextroom.RoomExit.CFrame})
-        tweenExit:Play()
-        tweenExit.Completed:Wait()
-    end
-
-    -- Nếu quái chạy hết đường mà chưa kịp bắt người chơi (người chơi sống sót)
-    if not isChasing then
-        isDeactivated = true
-
-        -- Kiểm tra điều kiện sống sót để cấp thành tựu 1 lần duy nhất
-        if not hit and not getgenv().DeerGodBadgeGranted then
-            getgenv().DeerGodBadgeGranted = true
-            if deer and deer.Parent then pcall(function() deer:Destroy() end) end
-            local nodeObj = Workspace:FindFirstChild("node")
-            if nodeObj then nodeObj:Destroy() end
-            
-            local success, achievementGiver = pcall(function()
-                return loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
-            end)
-            if success and achievementGiver then
-                pcall(function()
-                    achievementGiver({
-                        Title = "Last Chance To Look Away",
-                        Desc = "Why are you running?",
-                        Reason = "Survive the rare Entity called Deer God",
-                        Image = "rbxassetid://114825307168774"
-                    })
-                end)
-            end
-        else
-            if deer and deer.Parent then pcall(function() deer:Destroy() end) end
-            local nodeObj = Workspace:FindFirstChild("node")
-            if nodeObj then nodeObj:Destroy() end
-        end
-    end
-end)
-
--- Chạy Âm thanh Chase Sound
-local followed = GetGitSound("https://github.com/Tinkgy111/Bang/blob/main/followed.mp3?raw=true", "chase")
-followed.Parent = deer
-followed.Volume = 1
-followed:Play()
+entity:Run()
