@@ -17,10 +17,7 @@ local debounce = false
 local isJumpscaring = false
 local totalRoomsBroken = 0 -- Biến đếm số lần phá phòng
 
--- Asset Model ID
-local JUMPSCARE_MODEL_ID = "12263106166" 
-
--- DANH SÁCH ẢNH JUMPSCARE 2D
+-- DANH SÁCH ẢNH JUMPSCARE 2D (Đã khôi phục đầy đủ 6 ảnh)
 local ALL_JUMPSCARE_IMAGES = {
 	"rbxassetid://114943702871183",
 	"rbxassetid://77042919484581",
@@ -58,7 +55,7 @@ doorSound2.Volume = 3
 doorSound2.Parent = SoundService
 
 --========================================================--
--- ADVANCED PUSHABLE PHYSICS ROOM BREAK (GỒM ÂM THANH GITHUB) --
+-- ADVANCED PUSHABLE PHYSICS ROOM BREAK                   --
 --========================================================--
 local CurrentRooms = Workspace:WaitForChild("CurrentRooms")
 local breakSounds = {
@@ -286,25 +283,6 @@ local function BreakRoom(room)
 		breakSound:Play()
 		breakSound.Ended:Connect(function() breakSound:Destroy() end)
 
-		-- Âm thanh GitHub
-		local gitUrls = {
-			{ "https://github.com/cakmay227-svg/random/raw/refs/heads/main/XRecorder_Edited_20260801_01.mp3?raw=true", "jjjciie" },
-			{ "https://github.com/lynguyen26031993-design/-u/raw/refs/heads/main/Ripper%20bresking%20stuff%202.mp3", "kdjjccj" },
-			{ "https://github.com/lynguyen26031993-design/-u/raw/refs/heads/main/RipperBreakingstuff3.mp3", "jckdkxjchjjdj" }
-		}
-		local pick = gitUrls[math.random(1, #gitUrls)]
-		local gitSound = GetGitSound(pick[1], pick[2])
-		if gitSound then
-			gitSound.Parent = assetContainer
-			gitSound.Volume = 5
-			gitSound.PlaybackSpeed = 1
-			gitSound.RollOffMaxDistance = 1000
-			gitSound:Play()
-			gitSound.Ended:Connect(function()
-				gitSound:Destroy()
-			end)
-		end
-
 		local targets = {}
 		for _, v in ipairs(room:GetDescendants()) do
 			if v:IsA("Model") then
@@ -386,7 +364,7 @@ local entity = spawner.Create({
 		Max = math.random(5, 6),
 		Delay = math.random(1, 2)
 	},
-	Damage = { Enabled = false, Range = 0, Amount = 0 },
+	Damage = { Enabled = true, Range = 40, Amount = 0.001 }, -- Sát thương cực nhỏ để trigger OnDamagePlayer
 	Crucifixion = {
 		Enabled = true,
 		Range = 50,
@@ -426,7 +404,7 @@ entity:SetCallback("OnSpawned", function()
 				for _, tex in ipairs(textures) do
 					if not isJumpscaring then break end
 					e.Texture = tex
-					task.wait(0.03)
+					task.wait(0.015)
 				end
 			else
 				if e.Texture ~= originalTexture then
@@ -438,226 +416,207 @@ entity:SetCallback("OnSpawned", function()
 	end)
 end)
 
+local runningGitSound = nil
 entity:SetCallback("OnStartMoving", function()
 	print("multimonster has started moving")
 
 	task.spawn(function()
-		while task.wait(0.05) do
-			local player = Players.LocalPlayer
-			local character = player.Character or player.CharacterAdded:Wait()
-			local humanoid = character:FindFirstChildOfClass("Humanoid")
-			local HumanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-			local womp = Workspace:WaitForChild("multimonster", 2)
-			
-			if not humanoid or humanoid.Health <= 0 then break end
-
-			if not womp then break end
-			local wompwomp = womp:FindFirstChild("RushNew")
-			if not wompwomp then break end
-			if not HumanoidRootPart then continue end
-			
-			local distance = (HumanoidRootPart.Position - wompwomp.Position).Magnitude
-			
-			local raycastParams = RaycastParams.new()
-			raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-			raycastParams.FilterDescendantsInstances = {womp, character}
-			
-			local raycastResult = Workspace:Raycast(wompwomp.Position, (HumanoidRootPart.Position - wompwomp.Position), raycastParams)
-			local canSeePlayer = (raycastResult == nil)
-			
-			if (distance <= 30 or (canSeePlayer and distance <= 60)) then
-				if not character:GetAttribute("Hiding") and not debounce then
-					debounce = true
-					isJumpscaring = true
-					local lockCFrameConnection = nil
-					local camera = Workspace.CurrentCamera
-					local jumpscareModel = nil
-					
-					pcall(function()
-						if HumanoidRootPart then HumanoidRootPart.Anchored = true end
-						
-						local lockedCFrame = camera.CFrame
-						camera.CameraType = Enum.CameraType.Scriptable
-						
-						local savedTransparencies = {}
-						if wompwomp:IsA("BasePart") then
-							savedTransparencies[wompwomp] = wompwomp.Transparency
-							wompwomp.Transparency = 1
-						end
-						for _, child in ipairs(wompwomp:GetDescendants()) do
-							if child:IsA("BasePart") or child:IsA("Decal") then
-								savedTransparencies[child] = child.Transparency
-								child.Transparency = 1
-							end
-						end
-						
-						local successLoad, loadedObjects = pcall(function()
-							return game:GetObjects(JUMPSCARE_MODEL_ID)
-						end)
-						if successLoad and loadedObjects and #loadedObjects > 0 then
-							jumpscareModel = loadedObjects[1]
-							jumpscareModel.Parent = Workspace
-							for _, p in ipairs(jumpscareModel:GetDescendants()) do
-								if p:IsA("BasePart") then
-									p.CanCollide = false
-									p.Anchored = true
-								end
-							end
-						else
-							jumpscareModel = wompwomp
-							if jumpscareModel:IsA("BasePart") then jumpscareModel.Anchored = true end
-						end
-						
-						local CameraShakerModule = require(ReplicatedStorage:WaitForChild("CameraShaker"))
-						local jumpCamShake = CameraShakerModule.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
-							camera.CFrame = lockedCFrame * shakeCf
-						end)
-						jumpCamShake:Start()
-						jumpCamShake:ShakeOnce(10, 10, 0, 5.5, 1, 0)
-						
-						lockCFrameConnection = RunService.RenderStepped:Connect(function()
-							if not isJumpscaring then return end
-							camera.CameraType = Enum.CameraType.Scriptable
-							if jumpscareModel then
-								local targetCFrame = camera.CFrame * CFrame.new(0, -0.5, -4.5)
-								if jumpscareModel:IsA("Model") then
-									jumpscareModel:PivotTo(targetCFrame)
-								elseif jumpscareModel:IsA("BasePart") then
-									jumpscareModel.CFrame = targetCFrame
-								end
-							end
-						end)
-						
-						local scareSound = GetGitSound("https://github.com/thefigureblack/audios/blob/main/asixtyScareOmg.mp3?raw=true", "asixtyScareOmg")
-						scareSound.Parent = Workspace
-						scareSound.Volume = 5
-						scareSound:Play()
-						
-						task.wait(0.5)
-						
-						if lockCFrameConnection then
-							lockCFrameConnection:Disconnect()
-							lockCFrameConnection = nil
-						end
-						if jumpCamShake then jumpCamShake:Stop() end
-						
-						camera.CameraType = Enum.CameraType.Custom
-						local humanoidObj = character:FindFirstChildOfClass("Humanoid")
-						if humanoidObj then camera.CameraSubject = humanoidObj end
-						if HumanoidRootPart then
-							camera.CFrame = CFrame.new(camera.CFrame.Position, HumanoidRootPart.Position + HumanoidRootPart.CFrame.LookVector * 100)
-						end
-						
-						if jumpscareModel and jumpscareModel ~= wompwomp then
-							jumpscareModel:Destroy()
-						end
-						for part, originalTransparency in pairs(savedTransparencies) do
-							if part and part.Parent then
-								part.Transparency = originalTransparency
-							end
-						end
-						
-						local screenGui = Instance.new("ScreenGui")
-						screenGui.Name = "A60_JumpscareGui"
-						screenGui.Parent = player:WaitForChild("PlayerGui")
-						screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-						
-						local randomSelectedImage = ALL_JUMPSCARE_IMAGES[math.random(1, #ALL_JUMPSCARE_IMAGES)]
-						local jumpscareImg = Instance.new("ImageLabel")
-						jumpscareImg.Name = "JumpscareImage"
-						jumpscareImg.Parent = screenGui
-						jumpscareImg.AnchorPoint = Vector2.new(0.5, 0.5)
-						jumpscareImg.Position = UDim2.new(0.5, 0, 0.5, 0)
-						jumpscareImg.Size = UDim2.new(0, 0, 0, 0)
-						jumpscareImg.BackgroundTransparency = 1
-						jumpscareImg.Image = randomSelectedImage
-						jumpscareImg.ImageTransparency = 0
-						
-						local colorCorrection = Instance.new("ColorCorrectionEffect", Lighting)
-						TweenService:Create(colorCorrection, TweenInfo.new(0.2), {
-							Brightness = 0.2,
-							Contrast = 0.3,
-							Saturation = -0.3,
-							TintColor = Color3.fromRGB(255, 0, 4),
-						}):Play()
-						
-						if HumanoidRootPart then HumanoidRootPart.Anchored = false end
-						
-						pcall(function()
-							local remoteFolder = ReplicatedStorage:FindFirstChild("RemotesFolder")
-							if remoteFolder and remoteFolder:FindFirstChild("DeathHint") and firesignal then
-								firesignal(remoteFolder.DeathHint.OnClientEvent, {
-									"You fell victim to Multimonster...", "It travels at terrifying speeds across multiple rooms...", "Listen closely for its loud approach and hide immediately...", "Do not let it catch you in its line of sight!..."
-								}, "Blue", "Multimonster")
-							end
-						end)
-
-						pcall(function()
-							local statsFolder = ReplicatedStorage:FindFirstChild("GameStats")
-							if statsFolder then
-								local playerStats = statsFolder:FindFirstChild("Player_" .. player.Name)
-								if playerStats and playerStats:FindFirstChild("Total") and playerStats.Total:FindFirstChild("DeathCause") then
-									playerStats.Total.DeathCause.Value = "Multimonster"
-								end
-							end
-						end)
-
-						humanoid.Health = 0				
-						
-						TweenService:Create(jumpscareImg, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-							Size = UDim2.new(1.2, 0, 1.4, 0),
-							Rotation = math.random(-25, 25)
-						}):Play()
-						
-						task.wait(0.5)
-						isJumpscaring = false
-						
-						local function SafeCleanup()
-							pcall(function()
-								if screenGui then screenGui:Destroy() end
-								if colorCorrection then colorCorrection:Destroy() end
-								if scareSound then scareSound:Destroy() end
-							end)
-						end
-
-						local fadeTween = TweenService:Create(jumpscareImg, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { ImageTransparency = 1 })
-						fadeTween:Play()
-						
-						TweenService:Create(colorCorrection, TweenInfo.new(0.5), {
-							Brightness = 0,
-							Contrast = 0,
-							Saturation = 0,
-							TintColor = Color3.fromRGB(255, 255, 255),
-						}):Play()
-						
-						fadeTween.Completed:Connect(SafeCleanup)
-						task.delay(2.5, SafeCleanup)
-						
-						Debris:AddItem(screenGui, 4)
-						Debris:AddItem(colorCorrection, 3)
-						Debris:AddItem(scareSound, 3)
-						
-						task.spawn(function()
-							local postShake = CameraShakerModule.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
-								camera.CFrame = camera.CFrame * shakeCf
-							end)
-							postShake:Start()
-							
-							local startTime = tick()
-							while tick() - startTime < 1.5 and humanoid and humanoid.Health > 0 and character and character.Parent do
-								postShake:ShakeOnce(14, 20, 0.05, 0.1)
-								task.wait(0.1)
-							end
-							postShake:Stop()
-						end)
-						
-						task.wait(1)
-						debounce = false
-					end)
-				end
+		local womp = Workspace:WaitForChild("multimonster", 5)
+		if womp then
+			local assetContainer = womp:FindFirstChild("RushNew") or womp
+			local gitUrls = {
+				{ "https://github.com/cakmay227-svg/random/raw/refs/heads/main/XRecorder_Edited_20260801_01.mp3?raw=true", "jjjciie" },
+				{ "https://github.com/lynguyen26031993-design/-u/raw/refs/heads/main/Ripper%20bresking%20stuff%202.mp3", "kdjjccj" },
+				{ "https://github.com/lynguyen26031993-design/-u/raw/refs/heads/main/RipperBreakingstuff3.mp3", "jckdkxjchjjdj" }
+			}
+			local pick = gitUrls[math.random(1, #gitUrls)]
+			runningGitSound = GetGitSound(pick[1], pick[2])
+			if runningGitSound then
+				runningGitSound.Parent = assetContainer
+				runningGitSound.Volume = 5
+				runningGitSound.PlaybackSpeed = 1
+				runningGitSound.RollOffMaxDistance = 1000
+				runningGitSound:Play()
+				runningGitSound.Ended:Connect(function()
+					runningGitSound:Destroy()
+				end)
 			end
 		end
 	end)
+end)
+
+entity:SetCallback("OnDamagePlayer", function(newHealth)
+	local player = Players.LocalPlayer
+	local character = player.Character or player.CharacterAdded:Wait()
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local HumanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+	local womp = Workspace:WaitForChild("multimonster", 2)
+	
+	if not womp then return end
+	local wompwomp = womp:FindFirstChild("RushNew")
+	if not wompwomp then return end
+
+	if not character:GetAttribute("Hiding") and not debounce then
+		debounce = true
+		isJumpscaring = true
+		
+		-- Thay đổi từ Stop() sang Pause() để giữ đúng vị trí audio khi tạm dừng
+		pcall(function()
+			for _, v in pairs(womp:GetDescendants()) do
+				if v:IsA("Sound") and v.IsPlaying then
+					v:Pause()
+				end
+			end
+		end)
+
+		pcall(function()
+			if HumanoidRootPart then HumanoidRootPart.Anchored = true end
+			
+			local savedTransparencies = {}
+			if wompwomp:IsA("BasePart") then
+				savedTransparencies[wompwomp] = wompwomp.Transparency
+				wompwomp.Transparency = 1
+			end
+			
+			for _, child in ipairs(wompwomp:GetDescendants()) do
+				if child:IsA("BasePart") then
+					savedTransparencies[child] = child.Transparency
+					if child.Name ~= "Main" then
+						child.Transparency = 1
+					end
+				elseif child:IsA("Decal") then
+					savedTransparencies[child] = child.Transparency
+					child.Transparency = 0
+				end
+			end
+			
+			if wompwomp:IsA("BasePart") then wompwomp.Anchored = true end
+			
+			-- Khóa cframe bám trước camera & khóa WalkSpeed về 0
+			local renderConnection
+			renderConnection = RunService.RenderStepped:Connect(function()
+				if not isJumpscaring then
+					if renderConnection then renderConnection:Disconnect() end
+					return
+				end
+				local Camera = Workspace.CurrentCamera
+				if wompwomp:IsA("Model") then
+					wompwomp:PivotTo(Camera.CFrame * CFrame.new(0, -0.5, -6))
+				elseif wompwomp:IsA("BasePart") then
+					wompwomp.CFrame = Camera.CFrame * CFrame.new(0, -0.5, -6)
+				end
+				if humanoid then
+					humanoid.WalkSpeed = 0
+				end
+			end)
+			
+			local scareSound = GetGitSound("https://github.com/thefigureblack/audios/blob/main/asixtyScareOmg.mp3?raw=true", "asixtyScareOmg")
+			scareSound.Parent = Workspace
+			scareSound.Volume = 5
+			scareSound:Play()
+			
+			task.wait(0.5)
+			
+			for part, originalTransparency in pairs(savedTransparencies) do
+				if part and part.Parent then
+					part.Transparency = originalTransparency
+				end
+			end
+			
+			local screenGui = Instance.new("ScreenGui")
+			screenGui.Name = "A60_JumpscareGui"
+			screenGui.Parent = player:WaitForChild("PlayerGui")
+			screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+			
+			local randomSelectedImage = ALL_JUMPSCARE_IMAGES[math.random(1, #ALL_JUMPSCARE_IMAGES)]
+			local jumpscareImg = Instance.new("ImageLabel")
+			jumpscareImg.Name = "JumpscareImage"
+			jumpscareImg.Parent = screenGui
+			jumpscareImg.AnchorPoint = Vector2.new(0.5, 0.5)
+			jumpscareImg.Position = UDim2.new(0.5, 0, 0.5, 0)
+			jumpscareImg.Size = UDim2.new(0, 0, 0, 0)
+			jumpscareImg.BackgroundTransparency = 1
+			jumpscareImg.Image = randomSelectedImage
+			jumpscareImg.ImageTransparency = 0
+			
+			local colorCorrection = Instance.new("ColorCorrectionEffect", Lighting)
+			TweenService:Create(colorCorrection, TweenInfo.new(0.2), {
+				Brightness = 0.2,
+				Contrast = 0.3,
+				Saturation = -0.3,
+				TintColor = Color3.fromRGB(255, 0, 4),
+			}):Play()
+			
+			if HumanoidRootPart then HumanoidRootPart.Anchored = false end
+			
+			pcall(function()
+				local remoteFolder = ReplicatedStorage:FindFirstChild("RemotesFolder")
+				if remoteFolder and remoteFolder:FindFirstChild("DeathHint") and firesignal then
+					firesignal(remoteFolder.DeathHint.OnClientEvent, {
+						"You fell victim to Multimonster...", "It travels at terrifying speeds across multiple rooms...", "Listen closely for its loud approach and hide immediately...", "Do not let it catch you in its line of sight!..."
+					}, "Blue", "Multimonster")
+				end
+			end)
+
+			pcall(function()
+				local statsFolder = ReplicatedStorage:FindFirstChild("GameStats")
+				if statsFolder then
+					local playerStats = statsFolder:FindFirstChild("Player_" .. player.Name)
+					if playerStats and playerStats:FindFirstChild("Total") and playerStats.Total:FindFirstChild("DeathCause") then
+						playerStats.Total.DeathCause.Value = "Multimonster"
+					end
+				end
+			end)
+
+			TweenService:Create(jumpscareImg, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Size = UDim2.new(1.2, 0, 1.4, 0),
+				Rotation = math.random(-25, 25)
+			}):Play()
+			
+			task.wait(0.5)
+			isJumpscaring = false
+			
+			-- Thay đổi từ Play() sang Play() tiếp tục từ chỗ Pause (Roblox tự resume khi gọi Play trên paused sound)
+			pcall(function()
+				for _, v in pairs(womp:GetDescendants()) do
+					if v:IsA("Sound") then
+						v:Play()
+					end
+				end
+			end)
+
+			-- Jumpscare xong xuôi thì cho máu về 0 để chết
+			if humanoid then humanoid.Health = 0 end
+
+			local function SafeCleanup()
+				pcall(function()
+					if screenGui then screenGui:Destroy() end
+					if colorCorrection then colorCorrection:Destroy() end
+					if scareSound then scareSound:Destroy() end
+				end)
+			end
+
+			local fadeTween = TweenService:Create(jumpscareImg, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { ImageTransparency = 1 })
+			fadeTween:Play()
+			
+			TweenService:Create(colorCorrection, TweenInfo.new(0.5), {
+				Brightness = 0,
+				Contrast = 0,
+				Saturation = 0,
+				TintColor = Color3.fromRGB(255, 255, 255),
+			}):Play()
+			
+			fadeTween.Completed:Connect(SafeCleanup)
+			task.delay(2.5, SafeCleanup)
+			
+			Debris:AddItem(screenGui, 4)
+			Debris:AddItem(colorCorrection, 3)
+			Debris:AddItem(scareSound, 3)
+			
+			task.wait(1)
+			debounce = false
+		end)
+	end
 end)
 
 entity:SetCallback("OnEnterRoom", function(room, firstTime)
