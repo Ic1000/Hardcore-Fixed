@@ -364,7 +364,7 @@ local entity = spawner.Create({
 		Max = math.random(5, 6),
 		Delay = math.random(1, 2)
 	},
-	Damage = { Enabled = true, Range = 40, Amount = 0.001 }, -- Sát thương cực nhỏ để trigger OnDamagePlayer
+	Damage = { Enabled = true, Range = 60, Amount = 0.001 }, -- Sát thương cực nhỏ để trigger OnDamagePlayer
 	Crucifixion = {
 		Enabled = true,
 		Range = 50,
@@ -575,17 +575,7 @@ entity:SetCallback("OnDamagePlayer", function(newHealth)
 			
 			task.wait(0.5)
 			isJumpscaring = false
-			
-			-- Thay đổi từ Play() sang Play() tiếp tục từ chỗ Pause (Roblox tự resume khi gọi Play trên paused sound)
-			pcall(function()
-				for _, v in pairs(womp:GetDescendants()) do
-					if v:IsA("Sound") then
-						v:Play()
-					end
-				end
-			end)
-
-			-- Jumpscare xong xuôi thì cho máu về 0 để chết
+				
 			if humanoid then humanoid.Health = 0 end
 
 			local function SafeCleanup()
