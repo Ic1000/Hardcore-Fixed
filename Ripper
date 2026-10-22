@@ -460,7 +460,7 @@ local function SpawnRipper()
 			Entity = {
 				Name = "Ripper Entity",
 				Asset = "https://github.com/lynguyen26031993-design/-u/raw/refs/heads/main/Place_131351567799504_Model_RipperMovingkkd_1791822177.txt",
-				HeightOffset = 0.5
+				HeightOffset = 4.5
 			},
 
 			Lights = {
