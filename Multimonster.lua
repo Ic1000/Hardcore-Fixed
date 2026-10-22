@@ -267,6 +267,7 @@ local function BreakRoom(room)
 
 		local breakSound = Instance.new("Sound")
 		local breakSoundsList = {
+			"rbxassetid://9114223171",
 			"rbxassetid://9125992545", 
 			"rbxassetid://4004052860",
 			"rbxassetid://7142857558", 
@@ -276,7 +277,7 @@ local function BreakRoom(room)
 		}
 
 		if totalRoomsBroken == 1 then
-			breakSound.SoundId = "rbxassetid://9125992545"
+			breakSound.SoundId = "rbxassetid://9114223171"
 			breakSound.Volume = 4.5
 		else
 			breakSound.SoundId = breakSoundsList[math.random(1, #breakSoundsList)]
@@ -286,6 +287,27 @@ local function BreakRoom(room)
 		breakSound.Parent = assetContainer
 		breakSound:Play()
 		breakSound.Ended:Connect(function() breakSound:Destroy() end)
+
+		-- PHÁT ÂM THANH GITHUB KHI PHÁ PHÒNG (NẾU ĐÃ DI CHUYỂN)
+		if multimonsterIsMoving then
+			local gitUrls = {
+				{ "https://github.com/cakmay227-svg/random/raw/refs/heads/main/XRecorder_Edited_20260801_01.mp3?raw=true", "jjjciie" },
+				{ "https://github.com/lynguyen26031993-design/-u/raw/refs/heads/main/Ripper%20bresking%20stuff%202.mp3", "kdjjccj" },
+				{ "https://github.com/lynguyen26031993-design/-u/raw/refs/heads/main/RipperBreakingstuff3.mp3", "jckdkxjchjjdj" }
+			}
+			local pick = gitUrls[math.random(1, #gitUrls)]
+			local gitSound = GetGitSound(pick[1], pick[2])
+			if gitSound then
+				gitSound.Parent = assetContainer
+				gitSound.Volume = 5
+				gitSound.PlaybackSpeed = 1
+				gitSound.RollOffMaxDistance = 1000
+				gitSound:Play()
+				gitSound.Ended:Connect(function()
+					gitSound:Destroy()
+				end)
+			end
+		end
 
 		local targets = {}
 		for _, v in ipairs(room:GetDescendants()) do
@@ -447,6 +469,7 @@ entity:SetCallback("OnStartMoving", function()
 	task.spawn(function()
 		local womp = Workspace:WaitForChild("multimonster", 5)
 		if womp then
+			-- Đặt trực tiếp vào thực thể hoặc asset container để đảm bảo luôn tìm thấy
 			local assetContainer = womp:FindFirstChild("RushNew") or womp
 			local gitUrls = {
 				{ "https://github.com/cakmay227-svg/random/raw/refs/heads/main/XRecorder_Edited_20260801_01.mp3?raw=true", "jjjciie" },
