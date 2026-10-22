@@ -15,9 +15,14 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local debounce = false
 local isJumpscaring = false
-local totalRoomsBroken = 0 -- Biến đếm số lần phá phòng
+local totalRoomsBroken = 0
+local multimonsterIsMoving = false
 
--- DANH SÁCH ẢNH JUMPSCARE 2D (Đã khôi phục đầy đủ 6 ảnh)
+-- Biến lưu trữ hướng di chuyển của thực thể (tính theo frame)
+local entityLastPosition = nil
+local entityMoveDirection = Vector3.new(0, 0, -1) -- Hướng mặc định
+
+-- DANH SÁCH ẢNH JUMPSCARE 2D
 local ALL_JUMPSCARE_IMAGES = {
 	"rbxassetid://114943702871183",
 	"rbxassetid://77042919484581",
@@ -31,14 +36,22 @@ local ALL_JUMPSCARE_IMAGES = {
 --                  HELPER FUNCTIONS                      --
 --========================================================--
 local function GetGitSound(GithubSnd, SoundName)
-	if not isfile(SoundName .. ".mp3") then
-		pcall(function() writefile(SoundName .. ".mp3", game:HttpGet(GithubSnd)) end)
-	end
+	pcall(function()
+		if not isfile or not isfile(SoundName .. ".mp3") then
+			writefile(SoundName .. ".mp3", game:HttpGet(GithubSnd))
+		end
+	end)
+	
 	local sound = Instance.new("Sound")
 	local assetFunc = getcustomasset or getsynasset
-	if assetFunc and pcall(function() assetFunc(SoundName .. ".mp3") end) then
-		sound.SoundId = assetFunc(SoundName .. ".mp3")
-	else
+	local success = false
+	if assetFunc then
+		pcall(function()
+			sound.SoundId = assetFunc(SoundName .. ".mp3")
+			success = true
+		end)
+	end
+	if not success then
 		sound.SoundId = GithubSnd
 	end
 	return sound
@@ -55,7 +68,7 @@ doorSound2.Volume = 3
 doorSound2.Parent = SoundService
 
 --========================================================--
--- ADVANCED PUSHABLE PHYSICS ROOM BREAK                   --
+-- ADVANCED DIRECTIONAL PUSHABLE ROOM BREAK               --
 --========================================================--
 local CurrentRooms = Workspace:WaitForChild("CurrentRooms")
 local breakSounds = {
@@ -118,7 +131,7 @@ local function hasTargetParent(model, room)
 	return false
 end
 
-local function shakeCollision(collision)
+local function shakeCollision(collision, customDir)
 	if not collision or collision.Anchored then return end
 	
 	pcall(function()
@@ -135,21 +148,16 @@ local function shakeCollision(collision)
 	end)
 
 	local mass = collision.AssemblyMass
-	local force = mass * 12
+	local force = mass * 18 
 
-	for i = 1, 10 do
+	local pushDir = customDir or entityMoveDirection
+	pushDir = Vector3.new(pushDir.X, math.clamp(pushDir.Y, 0.1, 0.5), pushDir.Z).Unit
+
+	for i = 1, 8 do
 		if collision.Parent and not collision.Anchored then
-			local look = collision.CFrame.LookVector
-			look = Vector3.new(look.X, 0, look.Z)
-			if look.Magnitude > 0 then
-				look = look.Unit
-				local angle = math.rad(math.random(-90, 90))
-				local direction = CFrame.fromAxisAngle(Vector3.yAxis, angle):VectorToWorldSpace(look)
-				direction = Vector3.new(direction.X, math.random(0.2, 0.8), direction.Z).Unit
-
-				collision:ApplyImpulse(direction * force)
-				collision:ApplyAngularImpulse(Vector3.new(math.random(-2, 2), math.random(-2, 2), math.random(-2, 2)) * mass * 25)
-			end
+			local randomizedDir = (pushDir + Vector3.new(math.random(-20,20)/100, math.random(0,20)/100, math.random(-20,20)/100)).Unit
+			collision:ApplyImpulse(randomizedDir * force)
+			collision:ApplyAngularImpulse(Vector3.new(math.random(-3, 3), math.random(-3, 3), math.random(-3, 3)) * mass * 20)
 			task.wait(0.025)
 		end
 	end
@@ -169,15 +177,12 @@ local function setupModel(model, room, targets)
 
 	if existingCollision then 
 		existingCollision.Anchored = false
-		existingCollision.AssemblyLinearVelocity = Vector3.new(
-			math.random(-60, 60),
-			math.random(25, 55),
-			math.random(-60, 60)
-		)
+		local currentPushDir = entityMoveDirection
+		existingCollision.AssemblyLinearVelocity = (currentPushDir * math.random(80, 120)) + Vector3.new(0, math.random(20, 50), 0)
 		existingCollision.AssemblyAngularVelocity = Vector3.new(
-			math.random(-30, 30),
-			math.random(-30, 30),
-			math.random(-30, 30)
+			math.random(-40, 40),
+			math.random(-40, 40),
+			math.random(-40, 40)
 		)
 		table.insert(targets, existingCollision) 
 		return 
@@ -223,7 +228,7 @@ local function setupModel(model, room, targets)
 					collision:SetNetworkOwner(LocalPlayer)
 				end
 			end)
-			task.spawn(shakeCollision, collision)
+			task.spawn(shakeCollision, collision, entityMoveDirection)
 		end
 	end)
 
@@ -262,7 +267,6 @@ local function BreakRoom(room)
 
 		local breakSound = Instance.new("Sound")
 		local breakSoundsList = {
-			"rbxassetid://9114223171",
 			"rbxassetid://9125992545", 
 			"rbxassetid://4004052860",
 			"rbxassetid://7142857558", 
@@ -272,7 +276,7 @@ local function BreakRoom(room)
 		}
 
 		if totalRoomsBroken == 1 then
-			breakSound.SoundId = "rbxassetid://9114223171"
+			breakSound.SoundId = "rbxassetid://9125992545"
 			breakSound.Volume = 4.5
 		else
 			breakSound.SoundId = breakSoundsList[math.random(1, #breakSoundsList)]
@@ -290,18 +294,15 @@ local function BreakRoom(room)
 			end
 		end
 
+		local currentDir = entityMoveDirection
 		for _, collision in ipairs(targets) do
 			if collision and collision.Parent and collision:GetAttribute("WindCollision") == true then
 				collision.Anchored = false
-				collision.AssemblyLinearVelocity = Vector3.new(
-					math.random(-60, 60),
-					math.random(25, 55),
-					math.random(-60, 60)
-				)
+				collision.AssemblyLinearVelocity = (currentDir * math.random(70, 110)) + Vector3.new(0, math.random(25, 55), 0)
 				collision.AssemblyAngularVelocity = Vector3.new(
-					math.random(-30, 30),
-					math.random(-30, 30),
-					math.random(-30, 30)
+					math.random(-35, 35),
+					math.random(-35, 35),
+					math.random(-35, 35)
 				)
 			end
 		end
@@ -364,7 +365,7 @@ local entity = spawner.Create({
 		Max = math.random(5, 6),
 		Delay = math.random(1, 2)
 	},
-	Damage = { Enabled = true, Range = 60, Amount = 0.001 }, -- Sát thương cực nhỏ để trigger OnDamagePlayer
+	Damage = { Enabled = true, Range = 60, Amount = 125 },
 	Crucifixion = {
 		Enabled = true,
 		Range = 50,
@@ -372,19 +373,41 @@ local entity = spawner.Create({
 		Break = true
 	},
 	Death = {
-		Type = "Custom",
-		Cause = "multimonster"
+		Type = "Guiding",
+		Hints = {"You fell victim to Multimonster...", "It travels at terrifying speeds across multiple rooms...", "Listen closely for its loud approach and hide immediately...", "Do not let it catch you in its line of sight!..."},
+		Cause = "Multimonster"
 	}
 })
 
 ---====== Callbacks ======---
 entity:SetCallback("OnSpawned", function()
 	print("multimonster has spawned")
+	multimonsterIsMoving = false
+	entityLastPosition = nil
+	
 	local part = Workspace:WaitForChild("multimonster", 5)
 	if not part then return end
 
 	local object = part:WaitForChild("RushNew", 5)
 	if not object then return end
+	
+	-- Theo dõi liên tục hướng di chuyển của thực thể bằng RenderStepped
+	RunService.RenderStepped:Connect(function()
+		if part and part.Parent then
+			local primaryPart = part.PrimaryPart
+			if primaryPart then
+				local currentPos = primaryPart.Position
+				if entityLastPosition then
+					local diff = currentPos - entityLastPosition
+					if diff.Magnitude > 0.01 then
+						entityMoveDirection = diff.Unit
+					end
+				end
+				entityLastPosition = currentPos
+			end
+		end
+	end)
+
 	local attachment = object:WaitForChild("Main", 5)
 	local e = attachment and attachment:WaitForChild("Face", 5)
 	
@@ -419,6 +442,7 @@ end)
 local runningGitSound = nil
 entity:SetCallback("OnStartMoving", function()
 	print("multimonster has started moving")
+	multimonsterIsMoving = true
 
 	task.spawn(function()
 		local womp = Workspace:WaitForChild("multimonster", 5)
@@ -460,7 +484,6 @@ entity:SetCallback("OnDamagePlayer", function(newHealth)
 		debounce = true
 		isJumpscaring = true
 		
-		-- Thay đổi từ Stop() sang Pause() để giữ đúng vị trí audio khi tạm dừng
 		pcall(function()
 			for _, v in pairs(womp:GetDescendants()) do
 				if v:IsA("Sound") and v.IsPlaying then
@@ -492,7 +515,6 @@ entity:SetCallback("OnDamagePlayer", function(newHealth)
 			
 			if wompwomp:IsA("BasePart") then wompwomp.Anchored = true end
 			
-			-- Khóa cframe bám trước camera & khóa WalkSpeed về 0
 			local renderConnection
 			renderConnection = RunService.RenderStepped:Connect(function()
 				if not isJumpscaring then
@@ -547,26 +569,7 @@ entity:SetCallback("OnDamagePlayer", function(newHealth)
 				TintColor = Color3.fromRGB(255, 0, 4),
 			}):Play()
 			
-			if HumanoidRootPart then HumanoidRootPart.Anchored = false end
-			
-			pcall(function()
-				local remoteFolder = ReplicatedStorage:FindFirstChild("RemotesFolder")
-				if remoteFolder and remoteFolder:FindFirstChild("DeathHint") and firesignal then
-					firesignal(remoteFolder.DeathHint.OnClientEvent, {
-						"You fell victim to Multimonster...", "It travels at terrifying speeds across multiple rooms...", "Listen closely for its loud approach and hide immediately...", "Do not let it catch you in its line of sight!..."
-					}, "Blue", "Multimonster")
-				end
-			end)
-
-			pcall(function()
-				local statsFolder = ReplicatedStorage:FindFirstChild("GameStats")
-				if statsFolder then
-					local playerStats = statsFolder:FindFirstChild("Player_" .. player.Name)
-					if playerStats and playerStats:FindFirstChild("Total") and playerStats.Total:FindFirstChild("DeathCause") then
-						playerStats.Total.DeathCause.Value = "Multimonster"
-					end
-				end
-			end)
+			if HumanoidRootPart then HumanoidRootPart.Anchored = false end					
 
 			TweenService:Create(jumpscareImg, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 				Size = UDim2.new(1.2, 0, 1.4, 0),
@@ -574,9 +577,7 @@ entity:SetCallback("OnDamagePlayer", function(newHealth)
 			}):Play()
 			
 			task.wait(0.5)
-			isJumpscaring = false
-				
-			if humanoid then humanoid.Health = 0 end
+			isJumpscaring = false						
 
 			local function SafeCleanup()
 				pcall(function()
@@ -620,6 +621,7 @@ end)
 entity:SetCallback("OnDespawned", function()
 	print("multimonster has despawned")
 	TriggerExtremeShake()
+	multimonsterIsMoving = false
 
 	doorSound1:Stop()
 	doorSound2:Stop()
