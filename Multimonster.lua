@@ -67,6 +67,28 @@ doorSound2.SoundId = "rbxassetid://9126281769"
 doorSound2.Volume = 3
 doorSound2.Parent = SoundService
 
+-- Tải CustomAchievements theo đúng chuẩn hàm của Vynixu
+local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
+
+-- Dùng biến Global (getgenv) để khóa vĩnh viễn, chống nhận trùng lặp trong cả ván chơi
+if getgenv().MultimonsterAchievementGiven == nil then
+	getgenv().MultimonsterAchievementGiven = false
+end
+
+local function GiveMultimonsterAchievement()
+	if not getgenv().MultimonsterAchievementGiven then
+		getgenv().MultimonsterAchievementGiven = true -- Đánh dấu đã nhận vĩnh viễn cho màn này
+		pcall(function()
+			achievementGiver({
+				Title = "Speed Demon",
+				Desc = "Outrun the unstoppable force.",
+				Reason = "Survive the rare Entity called Multimonster",
+				Image = "rbxassetid://132714224363069"
+			})
+		end)
+	end
+end
+
 --========================================================--
 -- ADVANCED DIRECTIONAL PUSHABLE ROOM BREAK               --
 --========================================================--
@@ -288,7 +310,6 @@ local function BreakRoom(room)
 		breakSound:Play()
 		breakSound.Ended:Connect(function() breakSound:Destroy() end)
 
-		-- PHÁT ÂM THANH GITHUB KHI PHÁ PHÒNG (NẾU ĐÃ DI CHUYỂN)
 		if multimonsterIsMoving then
 			local gitUrls = {
 				{ "https://github.com/cakmay227-svg/random/raw/refs/heads/main/XRecorder_Edited_20260801_01.mp3?raw=true", "jjjciie" },
@@ -413,7 +434,6 @@ entity:SetCallback("OnSpawned", function()
 	local object = part:WaitForChild("RushNew", 5)
 	if not object then return end
 	
-	-- Theo dõi liên tục hướng di chuyển của thực thể bằng RenderStepped
 	RunService.RenderStepped:Connect(function()
 		if part and part.Parent then
 			local primaryPart = part.PrimaryPart
@@ -469,7 +489,6 @@ entity:SetCallback("OnStartMoving", function()
 	task.spawn(function()
 		local womp = Workspace:WaitForChild("multimonster", 5)
 		if womp then
-			-- Đặt trực tiếp vào thực thể hoặc asset container để đảm bảo luôn tìm thấy
 			local assetContainer = womp:FindFirstChild("RushNew") or womp
 			local gitUrls = {
 				{ "https://github.com/cakmay227-svg/random/raw/refs/heads/main/XRecorder_Edited_20260801_01.mp3?raw=true", "jjjciie" },
@@ -649,6 +668,9 @@ entity:SetCallback("OnDespawned", function()
 	doorSound1:Stop()
 	doorSound2:Stop()
 	
+	-- Cấp thành tựu sinh tồn thành công (được bảo vệ bằng Global Flag chống nhận trùng)
+	GiveMultimonsterAchievement()
+
 	local lighting = Lighting:FindFirstChild("MainColorCorrection")
 	if not lighting then
 		lighting = Instance.new("ColorCorrectionEffect")
