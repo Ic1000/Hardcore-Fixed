@@ -1,0 +1,363 @@
+-- ========================================================
+--        A-60 ENTITY SCRIPT (FIXED ACHIEVEMENT)
+-- ========================================================
+
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Debris = game:GetService("Debris")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local CurrentCamera = Workspace.CurrentCamera
+
+-- Khởi tạo biến toàn cục chống lặp thành tựu
+if getgenv().A60AchievementGotten == nil then
+	getgenv().A60AchievementGotten = false
+end
+
+local function GiveA60Achievement()
+	if getgenv().A60AchievementGotten then return end
+	
+	-- Kiểm tra an toàn xem người chơi có còn sống không trước khi trao thành tựu sống sót
+	local char = LocalPlayer.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum and hum.Health <= 0 then 
+		return -- Nếu chết rồi thì không cho thành tựu sống sót
+	end
+	
+	getgenv().A60AchievementGotten = true
+
+	task.spawn(function()
+		local success, achievementGiver = pcall(function()
+			return loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
+		end)
+		if success and achievementGiver then
+			pcall(function()
+				achievementGiver({
+					Title = "A nostalgic fright...",
+					Desc = "Might Come back...",
+					Reason = "Encounter and survive the rare Entity called A-60",
+					Image = "rbxassetid://17857830685"
+				})
+			end)
+		end
+	end)
+end
+
+-- Hàm tải âm thanh Git an toàn tuyệt đối, chống lỗi nil value
+local function GetGitSound(GithubSnd, SoundName)
+	local sound = Instance.new("Sound")
+	local success = pcall(function()
+		if writefile and isfile and (getcustomasset or getsynasset) then
+			if not isfile(SoundName .. ".mp3") then
+				writefile(SoundName .. ".mp3", game:HttpGet(GithubSnd))
+			end
+			local getAsset = getcustomasset or getsynasset
+			sound.SoundId = getAsset(SoundName .. ".mp3")
+		else
+			error("Custom assets not supported")
+		end
+	end)
+	
+	if not success or sound.SoundId == "" or sound.SoundId == nil then
+		sound.SoundId = "rbxassetid://9114223173" -- Fallback an toàn
+	end
+	return sound
+end
+
+local scareAudio = GetGitSound("https://github.com/thefigureblack/audios/blob/main/asixtyScareOmg.mp3?raw=true", "asixtyScareOmg")
+
+---====== Load spawner ======---
+local spawner = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Entity%20Spawner/V2/Source.lua"))()
+
+---====== Create entity ======---
+local entity = spawner.Create({
+	Entity = {
+		Name = "A-60",
+		Asset = "12263106166",
+		HeightOffset = 0.5
+	},
+	Lights = {
+		Flicker = {
+			Enabled = false,
+			Duration = 1
+		},
+		Shatter = false,
+		Repair = false
+	},
+	Earthquake = {
+		Enabled = false
+	},
+	CameraShake = {
+		Enabled = true,
+		Range = 50,
+		Values = {30, 30, 0.1, 1}
+	},
+	Movement = {
+		Speed = math.random(300, 350),
+		Delay = 3,
+		Reversed = false
+	},
+	Rebounding = {
+		Enabled = true,
+		Type = "Ambush",
+		Min = 4,
+		Max = 4,
+		Delay = 0.05
+	},
+	Damage = {
+		Enabled = true,
+		Range = 25,
+		Amount = 125,
+		IgnoreHiding = false
+	},
+	Crucifixion = {
+		Enabled = true,
+		Range = 40,
+		Resist = false,
+		Break = true
+	},
+	Death = {
+		Type = "Guiding",
+		Hints = {
+			"You died to an entity designated as A-60",
+			"It can appear at any moment, a loud scream will announce its presence.",
+			"When you hear it spawn, you must stay out of its reach as soon as possible.",
+			"It knows exactly where you are, so hiding in different places will not work..."
+		},
+		Cause = "A-60"
+	}
+})
+
+-- Hàm Thực Hiện Jumpscare A-60 khi chạm người chơi
+local function TriggerJumpscare()
+	print("Executing A-60 Native Jumpscare...")
+	
+	local jumpscareGui = Instance.new("ScreenGui")
+	jumpscareGui.Name = "A60_JumpscareGui"
+	jumpscareGui.Parent = PlayerGui
+	jumpscareGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+	local jumpscareEndImg = Instance.new("ImageLabel")
+	jumpscareEndImg.Name = "JumpscareEnd"
+	jumpscareEndImg.Parent = jumpscareGui
+	jumpscareEndImg.BackgroundTransparency = 1
+	jumpscareEndImg.Position = UDim2.new(0.468, 0, 0.455, 0)
+	jumpscareEndImg.Size = UDim2.new(0.063, 0, 0.088, 0)
+	jumpscareEndImg.ImageColor3 = Color3.fromRGB(255, 0, 4)
+
+	local fullImg = Instance.new("ImageLabel")
+	fullImg.Name = "Full"
+	fullImg.Parent = jumpscareGui
+	fullImg.BackgroundTransparency = 1
+	fullImg.Position = UDim2.new(-0.06, 0, -0.224, 0)
+	fullImg.Size = UDim2.new(1.121, 0, 1.447, 0)
+	fullImg.Image = "http://www.roblox.com/asset/?id=11151804223"
+	fullImg.ImageTransparency = 1
+
+	task.spawn(function()
+		local a60Model = Workspace:FindFirstChild("A-60")
+		if not a60Model then return end
+
+		local cameraShakerModule = require(ReplicatedStorage:WaitForChild("CameraShaker"))
+		local shaker = cameraShakerModule.new(Enum.RenderPriority.Camera.Value, function(cf)
+			CurrentCamera.CFrame = CurrentCamera.CFrame * cf
+		end)
+		shaker:Start()
+
+		local isScaring = true
+		local rushNew = a60Model:FindFirstChild("RushNew")
+		if not rushNew then return end
+
+		local scareClone = rushNew:Clone()
+		scareClone.Name = "A-60_SCARE"
+		scareClone.Parent = CurrentCamera
+
+		task.spawn(function()
+			while isScaring and scareClone and scareClone.Parent do
+				local imageFolder = scareClone:FindFirstChild("IMAGEIDS")
+				local face = scareClone:FindFirstChild("Main") and scareClone.Main:FindFirstChild("Face")
+				if face then
+					if imageFolder and #imageFolder:GetChildren() > 0 then
+						local randomImg = imageFolder:GetChildren()[math.random(1, #imageFolder:GetChildren())]
+						face.Texture = randomImg.Image
+					else
+						face.Texture = "rbxassetid://11394048190"
+					end
+				end
+				task.wait(Random.new():NextNumber(0, 0.02))
+			end
+		end)
+
+		for _, sound in ipairs(scareClone:GetDescendants()) do
+			if sound:IsA("Sound") then sound:Destroy() end
+		end
+
+		local scareSoundClone = scareAudio:Clone()
+		scareSoundClone.Parent = Workspace
+		scareSoundClone.Volume = 6
+		scareSoundClone:Play()
+
+		shaker:ShakeOnce(25, 25, 0, 4, 90, 60)
+
+		local colorCorrection = Instance.new("ColorCorrectionEffect", Lighting)
+		TweenService:Create(colorCorrection, TweenInfo.new(0.5), {
+			Brightness = 0.2,
+			Contrast = 0.2,
+			Saturation = -0.2,
+			TintColor = Color3.fromRGB(255, 0, 4),
+		}):Play()
+
+		local followConnection
+		followConnection = RunService.RenderStepped:Connect(function()
+			if isScaring and scareClone and scareClone.Parent then
+				scareClone.CFrame = scareClone.CFrame:Lerp(CurrentCamera.CFrame * CFrame.new(Vector3.new(0, -1.2, -5)), 0.8)
+			else
+				if followConnection then followConnection:Disconnect() end
+			end
+		end)
+
+		task.wait(0.5)
+		isScaring = false
+
+		local mainFace = scareClone:FindFirstChild("Main") and scareClone.Main:FindFirstChild("Face")
+		if mainFace then
+			jumpscareEndImg.Image = mainFace.Texture
+		end
+
+		TweenService:Create(jumpscareEndImg, TweenInfo.new(0.5), {
+			Size = fullImg.Size,
+			Position = fullImg.Position,
+			Rotation = math.random(-20, 20),
+		}):Play()
+
+		TweenService:Create(colorCorrection, TweenInfo.new(10), {
+			Brightness = 0,
+			Contrast = 0,
+			Saturation = 0,
+			TintColor = Color3.fromRGB(255, 255, 255),
+		}):Play()
+
+		task.wait(0.5)
+		TweenService:Create(jumpscareEndImg, TweenInfo.new(0.5), { ImageTransparency = 1 }):Play()
+		Debris:AddItem(scareClone, 1)
+		Debris:AddItem(scareSoundClone, 3)
+		Debris:AddItem(colorCorrection, 3)
+		Debris:AddItem(jumpscareGui, 3)
+	end)
+end
+
+---====== Debug entity Callbacks ======---
+
+entity:SetCallback("OnSpawned", function()
+	print("A-60 has spawned")
+	
+	task.spawn(function()
+		local a60Model = Workspace:WaitForChild("A-60", 5)
+		if not a60Model then return end
+		local rushNewPart = a60Model:WaitForChild("RushNew", 5)
+		if not rushNewPart then return end
+
+		local staticSound = rushNewPart:FindFirstChild("Static")
+		if staticSound then
+			staticSound:Play()
+			staticSound.PlaybackSpeed = 1.6
+		end
+
+		while entity:IsAlive() and RunService.Heartbeat:Wait() do
+			local imageFolder = rushNewPart:FindFirstChild("IMAGEIDS")
+			local face = rushNewPart:FindFirstChild("Main") and rushNewPart.Main:FindFirstChild("Face")
+			if face and imageFolder then
+				local images = imageFolder:GetChildren()
+				if #images > 0 then
+					face.Texture = images[math.random(1, #images)].Image
+				end
+			end
+			task.wait(Random.new():NextNumber(0, 0.03))
+		end
+	end)
+end)
+
+entity:SetCallback("OnStartMoving", function()
+	print("A-60 has started moving")
+end)
+
+entity:SetCallback("OnEnterRoom", function(room, firstTime)
+	if firstTime == true then
+		print("Entity has entered room: ".. room.Name.. " for the first time")
+	else
+		print("Entity has entered room: ".. room.Name.. " again")
+	end
+end)
+
+entity:SetCallback("OnRebounding", function(startOfRebound)
+	if startOfRebound == true then
+		print("Entity has started rebounding")
+	else
+		print("Entity has finished rebounding")
+	end
+end)
+
+entity:SetCallback("OnDespawning", function()
+	print("Entity is despawning")
+end)
+
+entity:SetCallback("OnDespawned", function()
+	print("A-60 has despawned")
+
+	local despawnSound = Instance.new("Sound")
+	despawnSound.SoundId = "rbxassetid://7757472223"
+	despawnSound.Volume = 10
+	despawnSound.PlaybackSpeed = 0.1
+	despawnSound.Parent = Workspace
+	despawnSound:Play()
+	Debris:AddItem(despawnSound, 25)
+
+	task.spawn(function()
+		while despawnSound.IsPlaying do
+			task.wait(0.5)
+			if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+				if LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health == 0 then
+					despawnSound:Destroy()
+					break
+				end
+			end
+		end
+	end)
+
+	local despawnColor = Instance.new("ColorCorrectionEffect", Lighting)
+	despawnColor.Name = "A60_DespawnEffect"
+	despawnColor.TintColor = Color3.fromRGB(255, 0, 4)
+	despawnColor.Saturation = -0.7
+	despawnColor.Contrast = 0.2
+	Debris:AddItem(despawnColor, 40)
+
+	TweenService:Create(despawnColor, TweenInfo.new(15), {
+		TintColor = Color3.fromRGB(255, 255, 255),
+		Saturation = 0,
+		Contrast = 0
+	}):Play()
+	TweenService:Create(despawnSound, TweenInfo.new(23), { Volume = 0 }):Play()
+
+	local cameraShakerModule = require(ReplicatedStorage:WaitForChild("CameraShaker"))
+	local shaker = cameraShakerModule.new(Enum.RenderPriority.Camera.Value, function(cf)
+		CurrentCamera.CFrame = CurrentCamera.CFrame * cf
+	end)
+	shaker:Start()
+	shaker:ShakeOnce(5, 45, 0.1, 20)
+
+	-- GỌI HÀM NHẬN THÀNH TỰU AN TOÀN KHI A-60 BIẾN MẤT (SỐNG SÓT)
+	GiveA60Achievement()
+end)
+
+-- Gắn trực tiếp Jumpscare chuẩn vào OnDamagePlayer của Spawner Vynixu
+entity:SetCallback("OnDamagePlayer", function(newHealth)		
+	TriggerJumpscare()
+end)
+
+---====== Run entity ======---
+entity:Run()
