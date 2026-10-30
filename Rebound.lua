@@ -301,7 +301,7 @@ local function RunReboundSequence()
     }):Play()
 
     -- 2. Âm thanh cảnh báo & Rung màn hình
-    CustomGitSound("https://github.com/Kotyara19k-Doorsspawner/Random-files/raw/main/Y2meta.app%20-%20DOORS%20HARDCORE_REBOUND%20MOVING%20START%20(320%20kbps).mp3", 5, "reboundspawn")
+    CustomGitSound("https://github.com/Anctarus7105/Custom-Sounds/raw/main/ReboundWarning.mp3", 5, "reboundspawn")
     
     camShake:Start()
     camShake:ShakeOnce(10, 3, 0.1, 6, 2, 0.5)
