@@ -41,7 +41,7 @@ local function GiveA60Achievement()
 					Title = "A nostalgic fright...",
 					Desc = "Might Come back...",
 					Reason = "Encounter and survive the rare Entity called A-60",
-					Image = "rbxassetid://17857830685"
+					Image = "rbxassetid://132714224363069"
 				})
 			end)
 		end
@@ -254,18 +254,13 @@ end
 ---====== Debug entity Callbacks ======---
 
 entity:SetCallback("OnSpawned", function()
-
-	local workspace = game:GetService("Workspace")
+local SoundService = game:GetService("SoundService")
 
 local customScream = Instance.new("Sound")
 customScream.SoundId = "rbxassetid://112497140615036"
-customScream.Parent = workspace
-customScream.Volume = 4
+customScream.Parent = SoundService 
+customScream.Volume = 10
 customScream:Play()
-
-customScream.Ended:Connect(function()
-    customScream:Destroy()
-end)
 	
 	task.spawn(function()
 		local a60Model = Workspace:WaitForChild("A-60", 5)
@@ -293,32 +288,7 @@ end)
 	end)
 end)
 
-entity:SetCallback("OnStartMoving", function()
-	print("A-60 has started moving")
-end)
-
-entity:SetCallback("OnEnterRoom", function(room, firstTime)
-	if firstTime == true then
-		print("Entity has entered room: ".. room.Name.. " for the first time")
-	else
-		print("Entity has entered room: ".. room.Name.. " again")
-	end
-end)
-
-entity:SetCallback("OnRebounding", function(startOfRebound)
-	if startOfRebound == true then
-		print("Entity has started rebounding")
-	else
-		print("Entity has finished rebounding")
-	end
-end)
-
-entity:SetCallback("OnDespawning", function()
-	print("Entity is despawning")
-end)
-
 entity:SetCallback("OnDespawned", function()
-	print("A-60 has despawned")
 
 	local despawnSound = Instance.new("Sound")
 	despawnSound.SoundId = "rbxassetid://7757472223"
