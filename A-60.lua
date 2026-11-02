@@ -291,10 +291,10 @@ end)
 entity:SetCallback("OnDespawned", function()
 
 	local despawnSound = Instance.new("Sound")
-	despawnSound.SoundId = "rbxassetid://7757472223"
+	despawnSound.SoundId = "rbxassetid://1837765695"
 	despawnSound.Volume = 10
-	despawnSound.PlaybackSpeed = 0.1
-	despawnSound.Parent = Workspace
+	despawnSound.PlaybackSpeed = 0.5
+	despawnSound.Parent = Workspace 
 	despawnSound:Play()
 	Debris:AddItem(despawnSound, 25)
 
