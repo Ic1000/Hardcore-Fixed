@@ -119,7 +119,7 @@ local ok, entity = pcall(function()
 				ParticleName = "ParticleEmitter",
 				ParticleTexture = "rbxassetid://12737595583",
 				SoundUrl = "https://github.com/eoyoustme/back/raw/main/Kill_with_static.mp3",
-				SlamSoundId = "rbxassetid://126631007956569",
+				SlamSoundId = "https://github.com/Ic1000/Misc/raw/refs/heads/main/RipperJumpscareSlam.mp3",
 				EndSoundId = "rbxassetid://4988621968",
 				Images = {
 					"rbxassetid://8482795900",
@@ -132,10 +132,10 @@ local ok, entity = pcall(function()
 		},
 
 		Crucifixion = {
-			Enabled = true,
+			Enabled = false,
 			Range = 40,
 			Resist = false,
-			Break = true
+			Break = false
 		},
 
 		Death = {
@@ -190,24 +190,12 @@ end
 -- CÁC CALLBACKS MẶC ĐỊNH & KIỂM TRA SỐNG SÓT NHẬN THÀNH TỰU
 -- ========================================================
 
-entity:SetCallback("OnSpawned", function()
-	print("[SPAWNER] Entity has spawned.")
-end)
-
-entity:SetCallback("OnStartMoving", function()
-	print("[SPAWNER] Entity has started moving.")
-end)
-
-entity:SetCallback("OnEnterRoom", function(room, firstTime)
-	print("[SPAWNER] Entered room:", room.Name)
-end)
-
-entity:SetCallback("OnDespawning", function()
-	print("[SPAWNER] Entity is despawning.")
-end)
-
 entity:SetCallback("OnDespawned", function()
-	print("[SPAWNER] Entity has despawned completely.")
+	local sound = Instance.new("Sound")
+	sound.Parent = SoundService
+	sound.SoundId = "rbxassetid://126631007956569"
+	sound.Volume = 4
+	sound:Play()
 	
 	-- Nếu người chơi còn sống sau khi Ripper biến mất -> Nhận thành tựu
 	local char = LocalPlayer.Character
