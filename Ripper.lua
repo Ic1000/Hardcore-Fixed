@@ -188,7 +188,23 @@ end
 
 -- ========================================================
 -- CÁC CALLBACKS MẶC ĐỊNH & KIỂM TRA SỐNG SÓT NHẬN THÀNH TỰU
--- ========================================================
+-- =======================================================
+
+entity:SetCallback("OnSpawned", function()
+
+		task.spawn(function()
+		local sound5 = Instance.new("Sound")
+		sound5.SoundId = "rbxassetid://12971875415"
+		sound5.Volume = 3
+		sound5.Parent = Workspace
+		local distortion = Instance.new("DistortionSoundEffect")
+		distortion.Level = 0.4
+		distortion.Parent = sound5
+		sound5:Play()
+		task.wait(7)
+		sound5:Destroy()
+	end)
+end)
 
 entity:SetCallback("OnDespawned", function()
 	local sound = Instance.new("Sound")
